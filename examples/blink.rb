@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Blink an LED connected to GPIO17.
+#
+# Wiring:
+#   Pi 5 pin 11 (GPIO17) --[330 Ω]-- LED anode
+#   LED cathode          -- GND (pin 9 or any GND pin)
+#
+# Run:
+#   sudo ruby examples/blink.rb
+#
+# Ctrl-C to stop.
+
+require_relative "../lib/libgpiod_ffi"
+
+GPIO_LED    = 17
+BLINK_DELAY = 0.5 # seconds
+
+puts "libgpiod version: #{LibgpiodFFI.version}"
+puts "Blinking GPIO#{GPIO_LED} at #{1.0 / (BLINK_DELAY * 2)} Hz. Press Ctrl-C to stop."
+
+LibgpiodFFI::Chip.open("/dev/gpiochip0") do |chip|
+  puts "Chip: #{chip.label} (#{chip.num_lines} lines)"
+
+  request = chip.request_lines(
+    offsets:   [GPIO_LED],
+    direction: :output,
+    consumer:  "libgpiod-ffi-blink"
+  )
+
+  begin
+    loop do
+      request.set_value(GPIO_LED, :active)
+      sleep BLINK_DELAY
+      request.set_value(GPIO_LED, :inactive)
+      sleep BLINK_DELAY
+    end
+  rescue Interrupt
+    puts "\nStopped."
+  ensure
+    request.set_value(GPIO_LED, :inactive)
+    request.release
+  end
+end
