@@ -61,12 +61,15 @@ module LibgpiodFFI
     #                  (only meaningful when direction is :input)
     # @param bias      [:as_is, :disabled, :pull_up, :pull_down]
     # @param active_low [Boolean] invert active/inactive logic
+    # @param debounce_us [Integer] kernel-level debounce period in microseconds
+    #                    (0 = disabled). Suppresses bounces shorter than this window.
+    #                    Typical value for mechanical buttons: 5_000 (5 ms).
     # @param initial_value [:active, :inactive] initial output value
     #                       (only meaningful when direction is :output)
     # @param consumer [String] name shown in kernel request list (optional)
     # @return [LineRequest]
     def request_lines(offsets:, direction:, edge: :none, bias: :as_is,
-                      active_low: false, initial_value: :inactive, consumer: nil)
+                      active_low: false, debounce_us: 0, initial_value: :inactive, consumer: nil)
       assert_open!
 
       settings_ptr = Native.gpiod_line_settings_new
@@ -80,6 +83,10 @@ module LibgpiodFFI
         check! Native.gpiod_line_settings_set_bias(settings_ptr, bias_value(bias)),
                "gpiod_line_settings_set_bias"
         Native.gpiod_line_settings_set_active_low(settings_ptr, active_low)
+        if debounce_us && debounce_us > 0
+          check! Native.gpiod_line_settings_set_debounce_period_us(settings_ptr, debounce_us),
+                 "gpiod_line_settings_set_debounce_period_us"
+        end
         if direction == :output
           check! Native.gpiod_line_settings_set_output_value(
                    settings_ptr, initial_value == :active ? Native::LINE_VALUE_ACTIVE : Native::LINE_VALUE_INACTIVE

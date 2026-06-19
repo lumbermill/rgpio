@@ -8,7 +8,7 @@
 #   LED cathode          -- GND (pin 9 or any GND pin)
 #
 # Run:
-#   sudo ruby examples/blink.rb
+#   ruby examples/blink.rb
 #
 # Ctrl-C to stop.
 

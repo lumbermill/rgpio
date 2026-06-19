@@ -84,6 +84,7 @@ module LibgpiodFFI
       # active_low: C bool — ffi maps :bool to uint8 (stdbool.h _Bool)
       attach_function :gpiod_line_settings_set_active_low,   [:pointer, :bool],  :int
       attach_function :gpiod_line_settings_set_output_value, [:pointer, :int],   :int
+      attach_function :gpiod_line_settings_set_debounce_period_us,  [:pointer, :ulong], :int
 
       # -----------------------------------------------------------------------
       # Line config — gpiod_line_config_*
