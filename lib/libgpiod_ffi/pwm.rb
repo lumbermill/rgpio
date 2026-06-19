@@ -234,9 +234,13 @@ module LibgpiodFFI
     end
 
     def wait_for_channel_path!
+      # Wait for the `period` file to become writable, not just the directory.
+      # The udev rule (99-com.rules) runs chgrp/chmod after the directory appears,
+      # so polling only for directory existence creates a race.
+      period_path = File.join(@channel_path, "period")
       deadline = Time.now + 3.0
-      until File.exist?(@channel_path)
-        raise PWMError, "Timeout: #{@channel_path} did not appear after export" if Time.now > deadline
+      until File.writable?(period_path)
+        raise PWMError, "Timeout: #{period_path} did not become writable after export" if Time.now > deadline
         sleep 0.02
       end
     end
@@ -244,6 +248,9 @@ module LibgpiodFFI
     def write_sysfs(attr, value)
       path = File.join(@channel_path, attr.to_s)
       File.write(path, value.to_s)
+    rescue Errno::EACCES => e
+      raise PWMError, "Failed to write #{path}: #{e.message} " \
+                      "(ensure user is in the gpio group, or run with sudo)"
     rescue Errno::ENOENT, Errno::EPERM => e
       raise PWMError, "Failed to write #{path}: #{e.message}"
     end

@@ -10,7 +10,7 @@ module LibgpiodFFI
     extend FFI::Library
 
     LIBRARY_AVAILABLE = begin
-      ffi_lib "gpiod"
+      ffi_lib ["libgpiod.so.3", "libgpiod.so.2", "gpiod"]
       true
     rescue LoadError
       false
@@ -56,7 +56,7 @@ module LibgpiodFFI
       # -----------------------------------------------------------------------
       # Version
       # -----------------------------------------------------------------------
-      attach_function :gpiod_version_string, [], :string
+      attach_function :gpiod_api_version, [], :string
 
       # -----------------------------------------------------------------------
       # Chip — gpiod_chip_*
@@ -132,7 +132,7 @@ module LibgpiodFFI
       # -----------------------------------------------------------------------
       attach_function :gpiod_edge_event_buffer_new,        [:size_t],          :pointer
       attach_function :gpiod_edge_event_buffer_free,       [:pointer],         :void
-      attach_function :gpiod_edge_event_buffer_num_events, [:pointer],         :size_t
+      attach_function :gpiod_edge_event_buffer_get_num_events, [:pointer],         :size_t
       # index is unsigned long
       attach_function :gpiod_edge_event_buffer_get_event,  [:pointer, :ulong], :pointer
 
