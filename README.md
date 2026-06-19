@@ -25,14 +25,14 @@ Install the runtime library on the Pi:
 
 ```sh
 sudo apt update
-sudo apt install libgpiod2
+sudo apt install libgpiod3
 ```
 
 To verify libgpiod is available and working:
 
 ```sh
 gpiodetect          # lists GPIO chips
-gpioinfo gpiochip0  # lists lines on chip 0
+gpioinfo --chip gpiochip0  # lists lines on chip 0
 ```
 
 ## Installation

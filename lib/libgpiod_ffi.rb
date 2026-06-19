@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "libgpiod_ffi/version"
-require "libgpiod_ffi/native"
-require "libgpiod_ffi/chip"
-require "libgpiod_ffi/line_request"
-require "libgpiod_ffi/pwm"
+require_relative "libgpiod_ffi/version"
+require_relative "libgpiod_ffi/native"
+require_relative "libgpiod_ffi/chip"
+require_relative "libgpiod_ffi/line_request"
+require_relative "libgpiod_ffi/pwm"
 
 # Ruby FFI bindings for libgpiod v2 (Linux GPIO character device).
 # Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi 5.
