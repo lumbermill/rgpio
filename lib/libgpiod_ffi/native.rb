@@ -49,9 +49,10 @@ module LibgpiodFFI
       # Bias enum (gpiod_line_bias)
       # -----------------------------------------------------------------------
       LINE_BIAS_AS_IS     = 1
-      LINE_BIAS_DISABLED  = 2
-      LINE_BIAS_PULL_UP   = 3
-      LINE_BIAS_PULL_DOWN = 4
+      LINE_BIAS_UNKNOWN   = 2
+      LINE_BIAS_DISABLED  = 3
+      LINE_BIAS_PULL_UP   = 4
+      LINE_BIAS_PULL_DOWN = 5
 
       # -----------------------------------------------------------------------
       # Version
@@ -82,7 +83,7 @@ module LibgpiodFFI
       attach_function :gpiod_line_settings_set_edge_detection, [:pointer, :int], :int
       attach_function :gpiod_line_settings_set_bias,         [:pointer, :int],   :int
       # active_low: C bool — ffi maps :bool to uint8 (stdbool.h _Bool)
-      attach_function :gpiod_line_settings_set_active_low,   [:pointer, :bool],  :int
+      attach_function :gpiod_line_settings_set_active_low,   [:pointer, :bool],  :void
       attach_function :gpiod_line_settings_set_output_value, [:pointer, :int],   :int
       attach_function :gpiod_line_settings_set_debounce_period_us,  [:pointer, :ulong], :int
 

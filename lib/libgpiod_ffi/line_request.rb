@@ -84,10 +84,11 @@ module LibgpiodFFI
       assert_active!
       return [] unless wait_edge_events(timeout: timeout)
 
-      buf = Native.gpiod_edge_event_buffer_new(capacity)
-      raise Error, "gpiod_edge_event_buffer_new failed" if buf.null?
-
+      buf = nil
       begin
+        buf = Native.gpiod_edge_event_buffer_new(capacity)
+        raise Error, "gpiod_edge_event_buffer_new failed" if buf.null?
+
         n = Native.gpiod_line_request_read_edge_events(@request_ptr, buf)
         raise SystemCallError.new("gpiod_line_request_read_edge_events", FFI.errno) if n == -1
 
@@ -101,7 +102,7 @@ module LibgpiodFFI
           }
         end
       ensure
-        Native.gpiod_edge_event_buffer_free(buf)
+        Native.gpiod_edge_event_buffer_free(buf) if buf && !buf.null?
       end
     end
 
