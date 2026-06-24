@@ -4,15 +4,22 @@
 # Drive a standard RC servo motor via hardware PWM on GPIO18.
 #
 # Wiring:
-#   GPIO18 (pin 12, RP1 PWM channel 2) -- servo signal wire (usually yellow/orange)
+#   GPIO12 (pin 32, RP1 PWM channel 0) -- servo signal wire (usually yellow/orange)
 #   5 V    (pin 2 or 4)                -- servo power (red)
 #   GND    (pin 6 or any GND)          -- servo ground (brown/black)
 #
-# Prerequisites — add to /boot/firmware/config.txt and reboot:
-#   dtoverlay=pwm,pin=18,func=4
+# Prerequisites — GPIO12 must be routed to RP1 PWM0. Two options:
 #
-# Verify PWM is available:
-#   ls /sys/class/pwm/
+#   (A) No reboot, NOT persistent (gone after reboot) — apply at runtime:
+#         sudo dtoverlay pwm pin=12 func=4
+#       Undo with: sudo dtoverlay -r pwm
+#
+#   (B) Persistent — add to /boot/firmware/config.txt and reboot:
+#         dtoverlay=pwm,pin=12,func=4
+#
+# Verify either way:
+#   pinctrl get 12        # should show "a0" / PWM0_CHAN0, not "none"
+#   ls /sys/class/pwm/    # a second pwmchip (RP1 PWM0) appears
 #
 # Run:
 #   sudo ruby examples/servo.rb
@@ -21,7 +28,7 @@
 
 require_relative "../lib/libgpiod_ffi"
 
-SERVO_GPIO     = 18
+SERVO_GPIO     = 12
 FREQUENCY_HZ   = 50      # Standard servo frequency (20 ms period)
 PULSE_MIN_US   = 500     # 0.5 ms — full counter-clockwise (varies by servo)
 PULSE_CENTER_US = 1500   # 1.5 ms — center position

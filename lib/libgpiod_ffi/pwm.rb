@@ -184,9 +184,14 @@ module LibgpiodFFI
     # Detect the RP1 PWM chip on Raspberry Pi 5.
     #
     # Strategy (in order of preference):
-    #   1. Chip whose sysfs device symlink path contains a known RP1 PWM
-    #      peripheral address (1f000d0).
-    #   2. Chip with npwm == 4 (RP1 exposes 4 channels on the 40-pin header).
+    #   1. Chip whose sysfs device symlink path is the RP1 PWM0 instance
+    #      (address 1f00098000). This is the peripheral the 40-pin header
+    #      pins route to: GPIO12/13/18/19 = PWM0_CHAN0..3 (verified via
+    #      `pinctrl funcs`).
+    #      NOTE: RP1 also has a PWM1 instance (1f0009c000) which is enabled by
+    #      default (fan) and ALSO reports npwm == 4 but is not wired to the
+    #      header — so this address match is required to avoid selecting it.
+    #   2. Chip with npwm == 4 (fallback when only one PWM instance is present).
     #   3. The only chip present.
     #
     # Raises PWMError if no chip can be found.
@@ -195,10 +200,10 @@ module LibgpiodFFI
       raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
                       "Is the dtoverlay configured? See README.md." if chips.empty?
 
-      # Strategy 1: RP1 device address in sysfs symlink path
+      # Strategy 1: RP1 PWM0 device address in sysfs symlink path
       rp1_candidate = chips.find do |c|
         device_link = File.readlink(c[:path]) rescue ""
-        device_link.include?("1f000d0")
+        device_link.include?("1f00098000")
       end
       return rp1_candidate[:chip] if rp1_candidate
 
