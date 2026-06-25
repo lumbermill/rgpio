@@ -312,4 +312,4 @@ sudo ruby examples/servo.rb
 
 ## License
 
-[MIT](LICENSE.txt)
+[MIT](LICENSE)
