@@ -56,10 +56,14 @@ gem install libgpiod-ffi
 ```ruby
 require "libgpiod_ffi"
 
-# Block form ensures the chip is closed on exit
-LibgpiodFFI::Chip.open("/dev/gpiochip0") do |chip|
+# Block form ensures the chip is closed on exit.
+# With no path, the header GPIO controller is auto-detected, so the same
+# code runs unchanged on Pi 5 / Pi 4 / Pi Zero (pass "/dev/gpiochipN" to
+# select one explicitly).
+LibgpiodFFI::Chip.open do |chip|
+  puts chip.path        # "/dev/gpiochip0"
   puts chip.label       # "pinctrl-rp1" on Pi 5
-  puts chip.num_lines   # 58
+  puts chip.num_lines   # 54
 
   request = chip.request_lines(
     offsets:   [17],         # GPIO17 = physical pin 11
@@ -247,8 +251,11 @@ sudo ruby examples/servo.rb
 
 | Method | Description |
 |---|---|
-| `.new(path)` | Open chip; default `/dev/gpiochip0` |
-| `.open(path) { \|chip\| }` | Block form; closes on exit |
+| `.new(path = nil)` | Open chip; auto-detects header controller when `path` is nil |
+| `.open(path = nil) { \|chip\| }` | Block form; closes on exit |
+| `.list` | Array of `{path:, name:, label:, num_lines:}` for every gpiochip |
+| `.detect_path` | Device path of the header GPIO controller (Pi 5 / 4 / Zero) |
+| `#path` | Device path this chip was opened with |
 | `#name` | Kernel name (`"gpiochip0"`) |
 | `#label` | Controller label (`"pinctrl-rp1"`) |
 | `#num_lines` | Number of GPIO lines |
@@ -304,8 +311,8 @@ sudo ruby examples/servo.rb
 
 | Phase | Scope |
 |---|---|
-| **1 (current)** | Pi 5, GPIO I/O + hardware PWM |
-| **2** | Pi 4 / Pi Zero; auto-detect gpiochip by label |
+| **1** | Pi 5, GPIO I/O + hardware PWM ✅ |
+| **2 (current)** | Auto-detect gpiochip by label ✅; Pi 4 / Pi Zero hardware validation (pending hardware) |
 | **3** | High-level API: `LED`, `Button`, `PWMLED`, … (separate gem) |
 
 ---
