@@ -1,8 +1,8 @@
 # libgpiod-ffi
 
-Ruby FFI bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
+Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
 
-Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — uses the `ffi` gem to call `libgpiod.so` directly.
+Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1).
 
 > **Phase 1 status:** Raspberry Pi 5 only. Pi 4 / Pi Zero support is planned for Phase 2.
 
@@ -296,12 +296,12 @@ sudo ruby examples/servo.rb
 ├─────────────────────────────────────────┤
 │  LibgpiodFFI::Chip / LineRequest        │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────────┤
-│  Native (FFI)    │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
+│  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
 └──────────────────┴──────────────────────┘
        libgpiod v2 ABI          Linux PWM sysfs
 ```
 
-- **Layer 1 (`Native`)** — raw `attach_function` declarations for libgpiod C functions
+- **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`)** — Ruby-idiomatic wrappers
 - **Layer 3 (Phase 3)** — high-level gpiozero-style API (planned as a separate gem)
 

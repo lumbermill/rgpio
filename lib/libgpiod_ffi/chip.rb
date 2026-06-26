@@ -45,7 +45,7 @@ module LibgpiodFFI
       @path = path || self.class.detect_path
       @chip_ptr = Native.gpiod_chip_open(@path)
       if @chip_ptr.null?
-        raise SystemCallError.new("gpiod_chip_open(#{@path})", FFI.errno)
+        raise SystemCallError.new("gpiod_chip_open(#{@path})", Native.errno)
       end
     end
 
@@ -175,8 +175,7 @@ module LibgpiodFFI
 
         begin
           offsets_arr = Array(offsets)
-          offsets_ptr = FFI::MemoryPointer.new(:uint32, offsets_arr.size)
-          offsets_ptr.put_array_of_uint32(0, offsets_arr)
+          offsets_ptr = Native.uint32_buffer(offsets_arr)
 
           check! Native.gpiod_line_config_add_line_settings(
                    line_config_ptr, offsets_ptr, offsets_arr.size, settings_ptr
@@ -186,7 +185,7 @@ module LibgpiodFFI
           begin
             request_ptr = Native.gpiod_chip_request_lines(@chip_ptr, req_config_ptr, line_config_ptr)
             if request_ptr.null?
-              raise SystemCallError.new("gpiod_chip_request_lines", FFI.errno)
+              raise SystemCallError.new("gpiod_chip_request_lines", Native.errno)
             end
             LineRequest.new(request_ptr, offsets_arr)
           ensure
@@ -221,7 +220,7 @@ module LibgpiodFFI
     def with_info
       assert_open!
       info = Native.gpiod_chip_get_info(@chip_ptr)
-      raise SystemCallError.new("gpiod_chip_get_info", FFI.errno) if info.null?
+      raise SystemCallError.new("gpiod_chip_get_info", Native.errno) if info.null?
       begin
         yield info
       ensure
@@ -231,13 +230,13 @@ module LibgpiodFFI
 
     def build_request_config(consumer)
       ptr = Native.gpiod_request_config_new
-      return FFI::Pointer::NULL if ptr.null?
+      return Native::NULL if ptr.null?
       Native.gpiod_request_config_set_consumer(ptr, consumer) if consumer
       ptr
     end
 
     def check!(ret, fn_name)
-      raise SystemCallError.new(fn_name, FFI.errno) if ret == -1
+      raise SystemCallError.new(fn_name, Native.errno) if ret == -1
     end
 
     def direction_value(sym)

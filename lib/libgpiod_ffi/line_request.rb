@@ -18,7 +18,7 @@ module LibgpiodFFI
   #   end
   #   request.release
   class LineRequest
-    # @param request_ptr [FFI::Pointer] raw gpiod_line_request*
+    # @param request_ptr [Fiddle::Pointer] raw gpiod_line_request*
     # @param offsets     [Array<Integer>] offsets included in this request
     def initialize(request_ptr, offsets)
       @request_ptr = request_ptr
@@ -39,7 +39,7 @@ module LibgpiodFFI
       when Native::LINE_VALUE_ACTIVE   then :active
       when Native::LINE_VALUE_INACTIVE then :inactive
       else
-        raise SystemCallError.new("gpiod_line_request_get_value(offset=#{offset})", FFI.errno)
+        raise SystemCallError.new("gpiod_line_request_get_value(offset=#{offset})", Native.errno)
       end
     end
 
@@ -52,7 +52,7 @@ module LibgpiodFFI
       assert_active!
       v = normalize_value(value)
       ret = Native.gpiod_line_request_set_value(@request_ptr, offset, v)
-      raise SystemCallError.new("gpiod_line_request_set_value(offset=#{offset})", FFI.errno) if ret == -1
+      raise SystemCallError.new("gpiod_line_request_set_value(offset=#{offset})", Native.errno) if ret == -1
     end
 
     # Wait for edge events on any line in this request.
@@ -69,7 +69,7 @@ module LibgpiodFFI
                      (timeout * 1_000_000_000).to_i
                    end
       ret = Native.gpiod_line_request_wait_edge_events(@request_ptr, timeout_ns)
-      raise SystemCallError.new("gpiod_line_request_wait_edge_events", FFI.errno) if ret == -1
+      raise SystemCallError.new("gpiod_line_request_wait_edge_events", Native.errno) if ret == -1
       ret == 1
     end
 
@@ -90,7 +90,7 @@ module LibgpiodFFI
         raise Error, "gpiod_edge_event_buffer_new failed" if buf.null?
 
         n = Native.gpiod_line_request_read_edge_events(@request_ptr, buf)
-        raise SystemCallError.new("gpiod_line_request_read_edge_events", FFI.errno) if n == -1
+        raise SystemCallError.new("gpiod_line_request_read_edge_events", Native.errno) if n == -1
 
         Array.new(n) do |i|
           ev = Native.gpiod_edge_event_buffer_get_event(buf, i)
