@@ -4,34 +4,111 @@ module LibgpiodFFI
   # Represents an open GPIO chip (e.g. /dev/gpiochip0).
   #
   # Usage (block form — recommended, ensures close on exit):
-  #   LibgpiodFFI::Chip.open("/dev/gpiochip0") do |chip|
+  #   # Auto-detect the GPIO controller wired to the 40-pin header
+  #   # (works on Pi 5 / Pi 4 / Pi Zero without code changes):
+  #   LibgpiodFFI::Chip.open do |chip|
   #     request = chip.request_lines(offsets: [17], direction: :output)
   #     # ...
   #   end
   #
+  #   # Or open a specific device explicitly:
+  #   LibgpiodFFI::Chip.open("/dev/gpiochip0") { |chip| ... }
+  #
   # Usage (manual):
-  #   chip = LibgpiodFFI::Chip.new("/dev/gpiochip0")
+  #   chip = LibgpiodFFI::Chip.new        # auto-detect
   #   # ...
   #   chip.close
   class Chip
-    DEFAULT_PATH = "/dev/gpiochip0"
+    # Glob matching every GPIO character device exposed by the kernel.
+    DEVICE_GLOB = "/dev/gpiochip*"
 
-    # @param path [String] path to the GPIO chip device (default: /dev/gpiochip0)
-    def initialize(path = DEFAULT_PATH)
+    # Labels of the GPIO controller wired to the 40-pin header, in detection
+    # priority order (newest SoC first). The label comes from the chip's
+    # info record (gpiod_chip_info_get_label) and is stable per SoC family:
+    #
+    #   pinctrl-rp1     → Raspberry Pi 5 (RP1 I/O controller)
+    #   pinctrl-bcm2711 → Raspberry Pi 4 / 400
+    #   pinctrl-bcm2835 → Pi Zero / Zero W / Zero 2 W / Pi 1 / 2 / 3
+    #
+    # On Pi 5 the SoC also exposes several "gpio-brcmstb@..." chips that are
+    # NOT on the header — matching by label avoids selecting those.
+    HEADER_CHIP_LABELS = %w[
+      pinctrl-rp1
+      pinctrl-bcm2711
+      pinctrl-bcm2835
+    ].freeze
+
+    # @param path [String, nil] path to the GPIO chip device. When nil
+    #   (the default), the header GPIO controller is auto-detected.
+    def initialize(path = nil)
       LibgpiodFFI.assert_available!
-      @path = path
-      @chip_ptr = Native.gpiod_chip_open(path)
+      @path = path || self.class.detect_path
+      @chip_ptr = Native.gpiod_chip_open(@path)
       if @chip_ptr.null?
-        raise SystemCallError.new("gpiod_chip_open(#{path})", FFI.errno)
+        raise SystemCallError.new("gpiod_chip_open(#{@path})", Native.errno)
       end
     end
 
     # Open a chip, yield it to the block, then close it.
-    def self.open(path = DEFAULT_PATH, &block)
+    # With no path, auto-detects the header GPIO controller.
+    def self.open(path = nil, &block)
       chip = new(path)
       block.call(chip)
     ensure
       chip&.close
+    end
+
+    # Enumerate every GPIO chip present on the system.
+    #
+    # @return [Array<Hash>] one entry per chip, sorted by device index:
+    #   { path:, name:, label:, num_lines: }
+    def self.list
+      LibgpiodFFI.assert_available!
+      Dir.glob(DEVICE_GLOB).sort_by { |p| device_index(p) }.filter_map do |path|
+        chip = new(path)
+        begin
+          { path: path, name: chip.name, label: chip.label, num_lines: chip.num_lines }
+        ensure
+          chip.close
+        end
+      rescue SystemCallError
+        # Skip chips we cannot open (e.g. permissions, races) rather than abort.
+        nil
+      end
+    end
+
+    # Resolve the device path of the GPIO controller wired to the 40-pin
+    # header. Pass `chips` to test the selection logic without hardware.
+    #
+    # @param chips [Array<Hash>] chip records as returned by {.list}
+    # @return [String] device path (e.g. "/dev/gpiochip0")
+    # @raise [NotAvailableError] when no usable GPIO chip is found
+    def self.detect_path(chips = list)
+      if chips.empty?
+        raise NotAvailableError,
+              "No GPIO chips found under #{DEVICE_GLOB}. Is this a Raspberry Pi?"
+      end
+      select_header_chip(chips).fetch(:path)
+    end
+
+    # Pick the header GPIO controller from a list of chip records.
+    # Prefers a known SoC label; falls back to the chip with the most lines
+    # (the header controller is, in practice, the largest one).
+    #
+    # @param chips [Array<Hash>] chip records as returned by {.list}
+    # @return [Hash] the selected chip record
+    def self.select_header_chip(chips)
+      HEADER_CHIP_LABELS.each do |label|
+        match = chips.find { |c| c[:label] == label }
+        return match if match
+      end
+      chips.max_by { |c| c[:num_lines] }
+    end
+
+    # Numeric index of a gpiochip device path ("/dev/gpiochip10" → 10),
+    # so chips sort numerically rather than lexically.
+    def self.device_index(path)
+      File.basename(path).delete_prefix("gpiochip").to_i
     end
 
     # @return [String] device path this chip was opened with
@@ -98,8 +175,7 @@ module LibgpiodFFI
 
         begin
           offsets_arr = Array(offsets)
-          offsets_ptr = FFI::MemoryPointer.new(:uint32, offsets_arr.size)
-          offsets_ptr.put_array_of_uint32(0, offsets_arr)
+          offsets_ptr = Native.uint32_buffer(offsets_arr)
 
           check! Native.gpiod_line_config_add_line_settings(
                    line_config_ptr, offsets_ptr, offsets_arr.size, settings_ptr
@@ -109,7 +185,7 @@ module LibgpiodFFI
           begin
             request_ptr = Native.gpiod_chip_request_lines(@chip_ptr, req_config_ptr, line_config_ptr)
             if request_ptr.null?
-              raise SystemCallError.new("gpiod_chip_request_lines", FFI.errno)
+              raise SystemCallError.new("gpiod_chip_request_lines", Native.errno)
             end
             LineRequest.new(request_ptr, offsets_arr)
           ensure
@@ -144,7 +220,7 @@ module LibgpiodFFI
     def with_info
       assert_open!
       info = Native.gpiod_chip_get_info(@chip_ptr)
-      raise SystemCallError.new("gpiod_chip_get_info", FFI.errno) if info.null?
+      raise SystemCallError.new("gpiod_chip_get_info", Native.errno) if info.null?
       begin
         yield info
       ensure
@@ -154,13 +230,13 @@ module LibgpiodFFI
 
     def build_request_config(consumer)
       ptr = Native.gpiod_request_config_new
-      return FFI::Pointer::NULL if ptr.null?
+      return Native::NULL if ptr.null?
       Native.gpiod_request_config_set_consumer(ptr, consumer) if consumer
       ptr
     end
 
     def check!(ret, fn_name)
-      raise SystemCallError.new(fn_name, FFI.errno) if ret == -1
+      raise SystemCallError.new(fn_name, Native.errno) if ret == -1
     end
 
     def direction_value(sym)

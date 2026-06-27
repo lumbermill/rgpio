@@ -1,8 +1,8 @@
 # libgpiod-ffi
 
-Ruby FFI bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
+Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
 
-Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — uses the `ffi` gem to call `libgpiod.so` directly.
+Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1).
 
 > **Phase 1 status:** Raspberry Pi 5 only. Pi 4 / Pi Zero support is planned for Phase 2.
 
@@ -56,10 +56,14 @@ gem install libgpiod-ffi
 ```ruby
 require "libgpiod_ffi"
 
-# Block form ensures the chip is closed on exit
-LibgpiodFFI::Chip.open("/dev/gpiochip0") do |chip|
+# Block form ensures the chip is closed on exit.
+# With no path, the header GPIO controller is auto-detected, so the same
+# code runs unchanged on Pi 5 / Pi 4 / Pi Zero (pass "/dev/gpiochipN" to
+# select one explicitly).
+LibgpiodFFI::Chip.open do |chip|
+  puts chip.path        # "/dev/gpiochip0"
   puts chip.label       # "pinctrl-rp1" on Pi 5
-  puts chip.num_lines   # 58
+  puts chip.num_lines   # 54
 
   request = chip.request_lines(
     offsets:   [17],         # GPIO17 = physical pin 11
@@ -137,22 +141,40 @@ Hardware PWM is controlled through the Linux PWM sysfs interface
 
 Add the appropriate line to `/boot/firmware/config.txt` and **reboot**:
 
-| GPIO pin | config.txt entry |
-|---|---|
-| GPIO12 (pin 32) | `dtoverlay=pwm,pin=12,func=4` |
-| GPIO13 (pin 33) | `dtoverlay=pwm,pin=13,func=4` |
-| GPIO18 (pin 12) | `dtoverlay=pwm,pin=18,func=4` |
-| GPIO19 (pin 35) | `dtoverlay=pwm,pin=19,func=4` |
+| GPIO pin | PWM channel | Alt function | config.txt entry |
+|---|---|---|---|
+| GPIO12 (pin 32) | PWM0 | Alt0 | `dtoverlay=pwm,pin=12,func=4` |
+| GPIO13 (pin 33) | PWM1 | Alt0 | `dtoverlay=pwm,pin=13,func=4` |
+| GPIO18 (pin 12) | PWM0 | Alt5 | `dtoverlay=pwm,pin=18,func=2` |
+| GPIO19 (pin 35) | PWM1 | Alt5 | `dtoverlay=pwm,pin=19,func=2` |
+
+> **`func` is the pin's Alt function, not the channel number:** GPIO12/13 use
+> `func=4` (Alt0), but GPIO18/19 use `func=2` (Alt5). Using the wrong `func`
+> loads the overlay without routing the pin to PWM — the pin stays `input` and
+> nothing reaches it. Verify with `pinctrl get <n>` (expect e.g. `a0` = Alt0).
 
 To enable two channels simultaneously (e.g. GPIO18 + GPIO19):
 
 ```
-dtoverlay=pwm-2chan,pin=18,func=4,pin2=19,func2=4
+dtoverlay=pwm-2chan,pin=18,func=2,pin2=19,func2=2
 ```
 
 > **Note:** The exact overlay parameters for Pi 5 depend on your kernel version.
 > If the above does not work, check `/boot/firmware/overlays/README` on the Pi
 > for the definitive parameter list.
+
+**Without rebooting** (volatile, for quick testing) you can load the same
+overlay at runtime — pass the parameters space-separated instead of as a CSV:
+
+```sh
+sudo dtoverlay pwm pin=12 func=4   # = dtoverlay=pwm,pin=12,func=4
+sudo dtoverlay -l                  # list loaded overlays
+sudo dtoverlay -r pwm              # unload
+```
+
+> **Always pass `pin` and `func` explicitly.** With no arguments
+> `sudo dtoverlay pwm` defaults to `pin=18,func=2` (GPIO18), so a servo wired to
+> GPIO12 gets no signal even though the program runs to completion.
 
 ### Step 2 — Verify sysfs entry
 
@@ -247,8 +269,11 @@ sudo ruby examples/servo.rb
 
 | Method | Description |
 |---|---|
-| `.new(path)` | Open chip; default `/dev/gpiochip0` |
-| `.open(path) { \|chip\| }` | Block form; closes on exit |
+| `.new(path = nil)` | Open chip; auto-detects header controller when `path` is nil |
+| `.open(path = nil) { \|chip\| }` | Block form; closes on exit |
+| `.list` | Array of `{path:, name:, label:, num_lines:}` for every gpiochip |
+| `.detect_path` | Device path of the header GPIO controller (Pi 5 / 4 / Zero) |
+| `#path` | Device path this chip was opened with |
 | `#name` | Kernel name (`"gpiochip0"`) |
 | `#label` | Controller label (`"pinctrl-rp1"`) |
 | `#num_lines` | Number of GPIO lines |
@@ -289,12 +314,12 @@ sudo ruby examples/servo.rb
 ├─────────────────────────────────────────┤
 │  LibgpiodFFI::Chip / LineRequest        │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────────┤
-│  Native (FFI)    │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
+│  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
 └──────────────────┴──────────────────────┘
        libgpiod v2 ABI          Linux PWM sysfs
 ```
 
-- **Layer 1 (`Native`)** — raw `attach_function` declarations for libgpiod C functions
+- **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`)** — Ruby-idiomatic wrappers
 - **Layer 3 (Phase 3)** — high-level gpiozero-style API (planned as a separate gem)
 
@@ -304,8 +329,8 @@ sudo ruby examples/servo.rb
 
 | Phase | Scope |
 |---|---|
-| **1 (current)** | Pi 5, GPIO I/O + hardware PWM |
-| **2** | Pi 4 / Pi Zero; auto-detect gpiochip by label |
+| **1** | Pi 5, GPIO I/O + hardware PWM ✅ |
+| **2 (current)** | Auto-detect gpiochip by label ✅; Pi 4 / Pi Zero hardware validation (pending hardware) |
 | **3** | High-level API: `LED`, `Button`, `PWMLED`, … (separate gem) |
 
 ---

@@ -6,8 +6,8 @@ require_relative "libgpiod_ffi/chip"
 require_relative "libgpiod_ffi/line_request"
 require_relative "libgpiod_ffi/pwm"
 
-# Ruby FFI bindings for libgpiod v2 (Linux GPIO character device).
-# Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi 5.
+# Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
+# the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
 #
 # Quick start — GPIO output:
 #   LibgpiodFFI::Chip.open do |chip|
