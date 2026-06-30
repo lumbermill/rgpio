@@ -1,8 +1,8 @@
-require_relative 'lib/libgpiod_ffi/version'
+require_relative 'lib/rgpio/version'
 
 Gem::Specification.new do |spec|
-  spec.name        = 'libgpiod-ffi'
-  spec.version     = LibgpiodFFI::VERSION
+  spec.name        = 'rgpio'
+  spec.version     = Rgpio::VERSION
   spec.authors     = ['ITO Yosei']
   spec.email       = ['y-itou@lumber-mill.co.jp']
   spec.summary     = 'Ruby bindings for libgpiod v2 (Linux GPIO character device)'
@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
                      'Uses the modern Linux GPIO character device API (uAPI v2) instead of the deprecated ' \
                      'sysfs interface. Bound through the stdlib `fiddle` so it works on every Pi, ' \
                      'including ARMv6 boards (Pi Zero / Pi 1).'
-  spec.homepage    = 'https://github.com/lumbermill/libgpiod-ffi'
+  spec.homepage    = 'https://github.com/lumbermill/rgpio'
   spec.license     = 'MIT'
 
   spec.required_ruby_version = '>= 3.4'

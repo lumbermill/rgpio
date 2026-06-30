@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module LibgpiodFFI
+module Rgpio
   # Controls a hardware PWM channel via the Linux PWM sysfs interface
   # (/sys/class/pwm/pwmchipN/pwmM/).
   #
@@ -19,7 +19,7 @@ module LibgpiodFFI
   #   GPIO19 → RP1 PWM chip, channel 3
   #
   # Usage (block form — recommended):
-  #   LibgpiodFFI::HardwarePWM.open(gpio: 18) do |pwm|
+  #   Rgpio::HardwarePWM.open(gpio: 18) do |pwm|
   #     pwm.frequency   = 50      # Hz  (standard servo)
   #     pwm.duty_cycle  = 0.075   # 7.5% = center position
   #     pwm.enable
@@ -28,7 +28,7 @@ module LibgpiodFFI
   #   end
   #
   # Usage (manual):
-  #   pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 0)
+  #   pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 0)
   #   pwm.frequency  = 50
   #   pwm.duty_cycle = 0.075
   #   pwm.enable
@@ -164,7 +164,7 @@ module LibgpiodFFI
 
     # Return a human-readable description of this PWM instance.
     def inspect
-      "#<LibgpiodFFI::HardwarePWM chip=#{@chip_num} channel=#{@channel} " \
+      "#<Rgpio::HardwarePWM chip=#{@chip_num} channel=#{@channel} " \
         "freq=#{frequency&.round(2)}Hz duty=#{@duty_ratio&.round(4)} " \
         "enabled=#{enabled?}>"
     end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module LibgpiodFFI
+module Rgpio
   # Holds an active kernel line request returned by Chip#request_lines.
   # Must be released when done via #release (or the block form of Chip.open).
   #

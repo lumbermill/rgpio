@@ -3,7 +3,7 @@
 require "fiddle"
 require "fiddle/import"
 
-module LibgpiodFFI
+module Rgpio
   # Raw bindings to libgpiod v2, built on Ruby's stdlib `fiddle`.
   #
   # Why fiddle instead of the `ffi` gem: fiddle ships compiled together with

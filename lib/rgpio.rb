@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-require_relative "libgpiod_ffi/version"
-require_relative "libgpiod_ffi/native"
-require_relative "libgpiod_ffi/chip"
-require_relative "libgpiod_ffi/line_request"
-require_relative "libgpiod_ffi/pwm"
+require_relative "rgpio/version"
+require_relative "rgpio/native"
+require_relative "rgpio/chip"
+require_relative "rgpio/line_request"
+require_relative "rgpio/pwm"
 
 # Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
 # the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
 #
 # Quick start — GPIO output:
-#   LibgpiodFFI::Chip.open do |chip|
+#   Rgpio::Chip.open do |chip|
 #     req = chip.request_lines(offsets: [17], direction: :output, consumer: "led")
 #     req.set_value(17, :active)
 #     sleep 1
@@ -19,13 +19,13 @@ require_relative "libgpiod_ffi/pwm"
 #   end
 #
 # Quick start — Hardware PWM (servo):
-#   LibgpiodFFI::HardwarePWM.open(gpio: 18) do |pwm|
+#   Rgpio::HardwarePWM.open(gpio: 18) do |pwm|
 #     pwm.frequency  = 50
 #     pwm.duty_cycle = 0.075
 #     pwm.enable
 #     sleep 2
 #   end
-module LibgpiodFFI
+module Rgpio
   # Raised for gem-level errors not covered by stdlib Errno classes.
   class Error < StandardError; end
 

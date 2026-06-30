@@ -26,7 +26,7 @@
 #
 # The servo sweeps from minimum to maximum position and back, three times.
 
-require_relative "../lib/libgpiod_ffi"
+require_relative "../lib/rgpio"
 
 SERVO_GPIO     = 12
 FREQUENCY_HZ   = 50      # Standard servo frequency (20 ms period)
@@ -47,11 +47,11 @@ def sweep(pwm, from_us, to_us, step_us, delay)
   sleep delay
 end
 
-puts "libgpiod version: #{LibgpiodFFI.version}"
-puts "Available PWM chips: #{LibgpiodFFI::HardwarePWM.available_chips.inspect}"
+puts "libgpiod version: #{Rgpio.version}"
+puts "Available PWM chips: #{Rgpio::HardwarePWM.available_chips.inspect}"
 puts "Driving servo on GPIO#{SERVO_GPIO} at #{FREQUENCY_HZ} Hz."
 
-LibgpiodFFI::HardwarePWM.open(gpio: SERVO_GPIO) do |pwm|
+Rgpio::HardwarePWM.open(gpio: SERVO_GPIO) do |pwm|
   puts "Using pwmchip#{pwm.chip_num}, channel #{pwm.channel}"
   pwm.frequency  = FREQUENCY_HZ
   pwm.duty_cycle = 0.0  # start with duty=0 before enabling

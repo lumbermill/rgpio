@@ -13,17 +13,17 @@
 #
 # Ctrl-C to stop.
 
-require_relative "../lib/libgpiod_ffi"
+require_relative "../lib/rgpio"
 
 GPIO_BUTTON = 27
 DEBOUNCE_S  = 0.050   # 50 ms安定でイベント確定
 POLL_S      = 0.005   # エッジイベント待ちのタイムアウト（＝ポーリング間隔）
 
-puts "libgpiod version: #{LibgpiodFFI.version}"
+puts "libgpiod version: #{Rgpio.version}"
 puts "Watching GPIO#{GPIO_BUTTON} for button events. Press Ctrl-C to stop."
 
 # No path given → auto-detect the header GPIO controller (Pi 5 / 4 / Zero).
-LibgpiodFFI::Chip.open do |chip|
+Rgpio::Chip.open do |chip|
   puts "Chip: #{chip.path} #{chip.label}"
 
   request = chip.request_lines(
@@ -32,7 +32,7 @@ LibgpiodFFI::Chip.open do |chip|
     edge:       :both,      # エッジ検出を有効にしてカーネルが値を更新し続けるようにする
     bias:       :pull_up,
     active_low: true,
-    consumer:   "libgpiod-ffi-button"
+    consumer:   "rgpio-button"
   )
 
   # エッジイベントで「変化があった」と気付き、get_valueで「実際の状態」を読む。

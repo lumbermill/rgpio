@@ -12,23 +12,23 @@
 #
 # Ctrl-C to stop.
 
-require_relative "../lib/libgpiod_ffi"
+require_relative "../lib/rgpio"
 
 GPIO_LED    = 17
 BLINK_DELAY = 0.5 # seconds
 
-puts "libgpiod version: #{LibgpiodFFI.version}"
+puts "libgpiod version: #{Rgpio.version}"
 puts "Blinking GPIO#{GPIO_LED} at #{1.0 / (BLINK_DELAY * 2)} Hz. Press Ctrl-C to stop."
 
 # No path given → auto-detect the header GPIO controller, so the same
 # script runs unchanged on Pi 5 / Pi 4 / Pi Zero.
-LibgpiodFFI::Chip.open do |chip|
+Rgpio::Chip.open do |chip|
   puts "Chip: #{chip.path} #{chip.label} (#{chip.num_lines} lines)"
 
   request = chip.request_lines(
     offsets:   [GPIO_LED],
     direction: :output,
-    consumer:  "libgpiod-ffi-blink"
+    consumer:  "rgpio-blink"
   )
 
   begin

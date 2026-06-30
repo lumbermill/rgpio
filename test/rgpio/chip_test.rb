@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../test_helper"
-require "libgpiod_ffi"
+require "rgpio"
 
 # Tests for the pure chip-selection logic (Phase 2: multi-board auto-detection).
 # These exercise Chip.select_header_chip / detect_path with fabricated chip
@@ -20,19 +20,19 @@ class ChipTest < Minitest::Test
       chip("/dev/gpiochip10", "gpio-brcmstb@107d508500", 32),
     ]
     assert_equal "/dev/gpiochip0",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   def test_selects_pi4_bcm2711
     chips = [chip("/dev/gpiochip0", "pinctrl-bcm2711", 58)]
     assert_equal "/dev/gpiochip0",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   def test_selects_pizero_bcm2835
     chips = [chip("/dev/gpiochip0", "pinctrl-bcm2835", 54)]
     assert_equal "/dev/gpiochip0",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   # Header label wins regardless of device order or line count.
@@ -42,7 +42,7 @@ class ChipTest < Minitest::Test
       chip("/dev/gpiochip0", "pinctrl-rp1", 54),
     ]
     assert_equal "/dev/gpiochip0",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   # First match wins when the same label appears twice (Pi 5 exposes the RP1
@@ -53,7 +53,7 @@ class ChipTest < Minitest::Test
       chip("/dev/gpiochip4", "pinctrl-rp1", 54),
     ]
     assert_equal "/dev/gpiochip0",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   # --- select_header_chip: fallback ----------------------------------- #
@@ -65,19 +65,19 @@ class ChipTest < Minitest::Test
       chip("/dev/gpiochip1", "some-future-soc", 64),
     ]
     assert_equal "/dev/gpiochip1",
-                 LibgpiodFFI::Chip.select_header_chip(chips)[:path]
+                 Rgpio::Chip.select_header_chip(chips)[:path]
   end
 
   # --- detect_path ---------------------------------------------------- #
 
   def test_detect_path_with_records
     chips = [chip("/dev/gpiochip0", "pinctrl-rp1", 54)]
-    assert_equal "/dev/gpiochip0", LibgpiodFFI::Chip.detect_path(chips)
+    assert_equal "/dev/gpiochip0", Rgpio::Chip.detect_path(chips)
   end
 
   def test_detect_path_empty_raises
-    err = assert_raises(LibgpiodFFI::NotAvailableError) do
-      LibgpiodFFI::Chip.detect_path([])
+    err = assert_raises(Rgpio::NotAvailableError) do
+      Rgpio::Chip.detect_path([])
     end
     assert_match(/No GPIO chips found/, err.message)
   end
@@ -86,7 +86,7 @@ class ChipTest < Minitest::Test
 
   def test_device_index_numeric_sort
     paths = ["/dev/gpiochip10", "/dev/gpiochip2", "/dev/gpiochip0"]
-    sorted = paths.sort_by { |p| LibgpiodFFI::Chip.device_index(p) }
+    sorted = paths.sort_by { |p| Rgpio::Chip.device_index(p) }
     assert_equal ["/dev/gpiochip0", "/dev/gpiochip2", "/dev/gpiochip10"], sorted
   end
 end

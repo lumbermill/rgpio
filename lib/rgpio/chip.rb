@@ -1,21 +1,21 @@
 # frozen_string_literal: true
 
-module LibgpiodFFI
+module Rgpio
   # Represents an open GPIO chip (e.g. /dev/gpiochip0).
   #
   # Usage (block form — recommended, ensures close on exit):
   #   # Auto-detect the GPIO controller wired to the 40-pin header
   #   # (works on Pi 5 / Pi 4 / Pi Zero without code changes):
-  #   LibgpiodFFI::Chip.open do |chip|
+  #   Rgpio::Chip.open do |chip|
   #     request = chip.request_lines(offsets: [17], direction: :output)
   #     # ...
   #   end
   #
   #   # Or open a specific device explicitly:
-  #   LibgpiodFFI::Chip.open("/dev/gpiochip0") { |chip| ... }
+  #   Rgpio::Chip.open("/dev/gpiochip0") { |chip| ... }
   #
   # Usage (manual):
-  #   chip = LibgpiodFFI::Chip.new        # auto-detect
+  #   chip = Rgpio::Chip.new        # auto-detect
   #   # ...
   #   chip.close
   class Chip
@@ -41,7 +41,7 @@ module LibgpiodFFI
     # @param path [String, nil] path to the GPIO chip device. When nil
     #   (the default), the header GPIO controller is auto-detected.
     def initialize(path = nil)
-      LibgpiodFFI.assert_available!
+      Rgpio.assert_available!
       @path = path || self.class.detect_path
       @chip_ptr = Native.gpiod_chip_open(@path)
       if @chip_ptr.null?
@@ -63,7 +63,7 @@ module LibgpiodFFI
     # @return [Array<Hash>] one entry per chip, sorted by device index:
     #   { path:, name:, label:, num_lines: }
     def self.list
-      LibgpiodFFI.assert_available!
+      Rgpio.assert_available!
       Dir.glob(DEVICE_GLOB).sort_by { |p| device_index(p) }.filter_map do |path|
         chip = new(path)
         begin

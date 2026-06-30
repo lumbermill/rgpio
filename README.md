@@ -1,4 +1,4 @@
-# libgpiod-ffi
+# rgpio
 
 Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
 
@@ -40,13 +40,13 @@ gpioinfo --chip gpiochip0  # lists lines on chip 0
 Add to your `Gemfile`:
 
 ```ruby
-gem "libgpiod-ffi"
+gem "rgpio"
 ```
 
 Or install directly:
 
 ```sh
-gem install libgpiod-ffi
+gem install rgpio
 ```
 
 ## GPIO Usage
@@ -54,13 +54,13 @@ gem install libgpiod-ffi
 ### LED blink (output)
 
 ```ruby
-require "libgpiod_ffi"
+require "rgpio"
 
 # Block form ensures the chip is closed on exit.
 # With no path, the header GPIO controller is auto-detected, so the same
 # code runs unchanged on Pi 5 / Pi 4 / Pi Zero (pass "/dev/gpiochipN" to
 # select one explicitly).
-LibgpiodFFI::Chip.open do |chip|
+Rgpio::Chip.open do |chip|
   puts chip.path        # "/dev/gpiochip0"
   puts chip.label       # "pinctrl-rp1" on Pi 5
   puts chip.num_lines   # 54
@@ -85,9 +85,9 @@ end
 ### Button input with edge detection
 
 ```ruby
-require "libgpiod_ffi"
+require "rgpio"
 
-LibgpiodFFI::Chip.open do |chip|
+Rgpio::Chip.open do |chip|
   request = chip.request_lines(
     offsets:    [27],        # GPIO27 = physical pin 13
     direction:  :input,
@@ -190,10 +190,10 @@ On Pi 5 the RP1 GPIO-header PWM chip typically appears as `pwmchip2` with 4 chan
 ### Step 3 — Drive a servo
 
 ```ruby
-require "libgpiod_ffi"
+require "rgpio"
 
 # gpio: auto-selects chip and channel for GPIO18 on Pi 5
-LibgpiodFFI::HardwarePWM.open(gpio: 18) do |pwm|
+Rgpio::HardwarePWM.open(gpio: 18) do |pwm|
   puts "Using pwmchip#{pwm.chip_num}, channel #{pwm.channel}"
 
   pwm.frequency  = 50      # Hz — standard servo period (20 ms)
@@ -226,13 +226,13 @@ end
 If auto-detection fails, you can specify the chip number explicitly:
 
 ```ruby
-pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 0)
+pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 0)
 ```
 
 List available chips:
 
 ```ruby
-LibgpiodFFI::HardwarePWM.available_chips
+Rgpio::HardwarePWM.available_chips
 # => [{chip: 0, npwm: 2, path: "/sys/class/pwm/pwmchip0"},
 #     {chip: 2, npwm: 4, path: "/sys/class/pwm/pwmchip2"}]
 ```
@@ -258,14 +258,14 @@ sudo ruby examples/servo.rb
 
 ## API reference
 
-### `LibgpiodFFI`
+### `Rgpio`
 
 | Method | Description |
 |---|---|
 | `.available?` | `true` if `libgpiod.so` was found |
 | `.version` | libgpiod version string (e.g. `"2.1.3"`) |
 
-### `LibgpiodFFI::Chip`
+### `Rgpio::Chip`
 
 | Method | Description |
 |---|---|
@@ -280,7 +280,7 @@ sudo ruby examples/servo.rb
 | `#request_lines(...)` | Returns a `LineRequest` |
 | `#close` | Close the chip |
 
-### `LibgpiodFFI::LineRequest`
+### `Rgpio::LineRequest`
 
 | Method | Description |
 |---|---|
@@ -290,7 +290,7 @@ sudo ruby examples/servo.rb
 | `#read_edge_events(timeout:, capacity:)` | Array of event hashes |
 | `#release` | Release kernel request |
 
-### `LibgpiodFFI::HardwarePWM`
+### `Rgpio::HardwarePWM`
 
 | Method | Description |
 |---|---|
@@ -312,7 +312,7 @@ sudo ruby examples/servo.rb
 ┌─────────────────────────────────────────┐
 │  High-level API (Phase 3, future gem)   │  LED, Button, Servo classes
 ├─────────────────────────────────────────┤
-│  LibgpiodFFI::Chip / LineRequest        │  OOP wrappers (this gem)
+│  Rgpio::Chip / LineRequest              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────────┤
 │  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
 └──────────────────┴──────────────────────┘

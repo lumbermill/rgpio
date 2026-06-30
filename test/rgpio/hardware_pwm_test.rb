@@ -1,20 +1,20 @@
 # frozen_string_literal: true
 
 require_relative "../test_helper"
-require "libgpiod_ffi"
+require "rgpio"
 
 class HardwarePWMTest < Minitest::Test
   def setup
-    @sysfs_root = Dir.mktmpdir("libgpiod_ffi_test_")
-    @original_root = LibgpiodFFI::HardwarePWM::PWM_SYSFS_ROOT
-    LibgpiodFFI::HardwarePWM.send(:remove_const, :PWM_SYSFS_ROOT)
-    LibgpiodFFI::HardwarePWM.const_set(:PWM_SYSFS_ROOT, @sysfs_root)
+    @sysfs_root = Dir.mktmpdir("rgpio_test_")
+    @original_root = Rgpio::HardwarePWM::PWM_SYSFS_ROOT
+    Rgpio::HardwarePWM.send(:remove_const, :PWM_SYSFS_ROOT)
+    Rgpio::HardwarePWM.const_set(:PWM_SYSFS_ROOT, @sysfs_root)
   end
 
   def teardown
     FileUtils.rm_rf(@sysfs_root)
-    LibgpiodFFI::HardwarePWM.send(:remove_const, :PWM_SYSFS_ROOT)
-    LibgpiodFFI::HardwarePWM.const_set(:PWM_SYSFS_ROOT, @original_root)
+    Rgpio::HardwarePWM.send(:remove_const, :PWM_SYSFS_ROOT)
+    Rgpio::HardwarePWM.const_set(:PWM_SYSFS_ROOT, @original_root)
   end
 
   # --- helpers ---
@@ -49,7 +49,7 @@ class HardwarePWMTest < Minitest::Test
   def pwm_for_gpio18
     add_chip(num: 2, npwm: 4, rp1_address: "1f00098000")
     add_channel(chip_num: 2, channel: 2)
-    LibgpiodFFI::HardwarePWM.new(gpio: 18)
+    Rgpio::HardwarePWM.new(gpio: 18)
   end
 
   # ------------------------------------------------------------------ #
@@ -57,19 +57,19 @@ class HardwarePWMTest < Minitest::Test
 
   def test_gpio_to_pwm_channel_mapping
     assert_equal({ 12 => 0, 13 => 1, 18 => 2, 19 => 3 },
-                 LibgpiodFFI::HardwarePWM::GPIO_TO_PWM_CHANNEL_PI5)
+                 Rgpio::HardwarePWM::GPIO_TO_PWM_CHANNEL_PI5)
   end
 
   # ------------------------------------------------------------------ #
   # .new argument validation
 
   def test_new_gpio_invalid_raises_argument_error
-    err = assert_raises(ArgumentError) { LibgpiodFFI::HardwarePWM.new(gpio: 17) }
+    err = assert_raises(ArgumentError) { Rgpio::HardwarePWM.new(gpio: 17) }
     assert_match(/GPIO17.*not a hardware PWM pin/, err.message)
   end
 
   def test_new_chip_missing_raises_pwm_error
-    err = assert_raises(LibgpiodFFI::PWMError) { LibgpiodFFI::HardwarePWM.new(chip: 99, channel: 0) }
+    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: 99, channel: 0) }
     assert_match(/PWM chip not found.*pwmchip99/, err.message)
   end
 
@@ -77,7 +77,7 @@ class HardwarePWMTest < Minitest::Test
   # .available_chips
 
   def test_available_chips_empty
-    assert_empty LibgpiodFFI::HardwarePWM.available_chips
+    assert_empty Rgpio::HardwarePWM.available_chips
   end
 
   def test_available_chips_sorted
@@ -87,7 +87,7 @@ class HardwarePWMTest < Minitest::Test
       { chip: 0, npwm: 2, path: "#{@sysfs_root}/pwmchip0" },
       { chip: 2, npwm: 4, path: "#{@sysfs_root}/pwmchip2" },
     ]
-    assert_equal expected, LibgpiodFFI::HardwarePWM.available_chips
+    assert_equal expected, Rgpio::HardwarePWM.available_chips
   end
 
   # ------------------------------------------------------------------ #
@@ -97,7 +97,7 @@ class HardwarePWMTest < Minitest::Test
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 4, rp1_address: "1f00098000")
     add_channel(chip_num: 2, channel: 2)
-    pwm = LibgpiodFFI::HardwarePWM.new(gpio: 18)
+    pwm = Rgpio::HardwarePWM.new(gpio: 18)
     assert_equal 2, pwm.chip_num
   end
 
@@ -105,26 +105,26 @@ class HardwarePWMTest < Minitest::Test
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 0)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: :auto, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0)
     assert_equal 2, pwm.chip_num
   end
 
   def test_detect_strategy3_single_chip
     add_chip(num: 3, npwm: 2)
     add_channel(chip_num: 3, channel: 0)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: :auto, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0)
     assert_equal 3, pwm.chip_num
   end
 
   def test_detect_no_chips_raises_pwm_error
-    err = assert_raises(LibgpiodFFI::PWMError) { LibgpiodFFI::HardwarePWM.new(chip: :auto, channel: 0) }
+    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0) }
     assert_match(/No PWM chips found/, err.message)
   end
 
   def test_detect_ambiguous_raises_pwm_error
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 2)
-    err = assert_raises(LibgpiodFFI::PWMError) { LibgpiodFFI::HardwarePWM.new(chip: :auto, channel: 0) }
+    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0) }
     assert_match(/Cannot auto-detect.*pwmchip/, err.message)
   end
 
@@ -167,8 +167,8 @@ class HardwarePWMTest < Minitest::Test
   def test_duty_cycle_without_frequency_raises
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 2)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 2)
-    err = assert_raises(LibgpiodFFI::PWMError) { pwm.duty_cycle = 0.5 }
+    pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 2)
+    err = assert_raises(Rgpio::PWMError) { pwm.duty_cycle = 0.5 }
     assert_match(/Set frequency=/, err.message)
   end
 
@@ -182,15 +182,15 @@ class HardwarePWMTest < Minitest::Test
   def test_pulse_width_nil_before_set
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 2)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 2)
+    pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 2)
     assert_nil pwm.pulse_width_us
   end
 
   def test_pulse_width_without_frequency_raises
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 2)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 2)
-    err = assert_raises(LibgpiodFFI::PWMError) { pwm.pulse_width_us = 1500 }
+    pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 2)
+    err = assert_raises(Rgpio::PWMError) { pwm.pulse_width_us = 1500 }
     assert_match(/Set frequency=/, err.message)
   end
 
@@ -200,7 +200,7 @@ class HardwarePWMTest < Minitest::Test
   def test_inspect_format
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 0)
-    pwm = LibgpiodFFI::HardwarePWM.new(chip: 2, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 0)
     assert_match(/chip=2.*channel=0.*enabled=false/, pwm.inspect)
   end
 end
