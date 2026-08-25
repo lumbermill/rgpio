@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (Ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.4"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+
+      # The test suite is logic-only: chip-selection, PWM sysfs (mocked via a
+      # tmpdir), and the batch-I/O buffer helpers all run without GPIO hardware
+      # or libgpiod. `require "rgpio"` degrades gracefully when libgpiod.so is
+      # absent (Rgpio.available? == false), so no native library is installed.
+      #
+      # Bundler is intentionally not used: the committed Gemfile.lock is pinned
+      # to the maintainer's aarch64 / Bundler 4 dev box, which x86_64 CI runners
+      # cannot resolve. The suite only needs minitest + rake.
+      - name: Install test dependencies
+        run: gem install --no-document minitest rake
+
+      - name: Run tests
+        run: rake test
