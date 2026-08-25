@@ -55,6 +55,51 @@ module Rgpio
       raise SystemCallError.new("gpiod_line_request_set_value(offset=#{offset})", Native.errno) if ret == -1
     end
 
+    # Read several lines atomically in a single ioctl.
+    #
+    # @param offsets [Array<Integer>] offsets to read; defaults to every offset
+    #                in this request. Must be a subset of #offsets.
+    # @return [Hash{Integer=>Symbol}] offset => :active / :inactive, in the
+    #                order given
+    # @raise [SystemCallError] on error
+    def get_values(offsets = @offsets)
+      assert_active!
+      offs = Array(offsets)
+      return {} if offs.empty?
+
+      offsets_ptr = Native.uint32_buffer(offs)
+      values_ptr  = Native.int_output_buffer(offs.size)
+      ret = Native.gpiod_line_request_get_values_subset(@request_ptr, offs.size, offsets_ptr, values_ptr)
+      raise SystemCallError.new("gpiod_line_request_get_values_subset", Native.errno) if ret == -1
+
+      raw = Native.read_int_buffer(values_ptr, offs.size)
+      offs.each_with_index.each_with_object({}) do |(offset, i), out|
+        out[offset] = decode_value(raw[i], offset)
+      end
+    end
+
+    # Set several output lines atomically in a single ioctl.
+    #
+    # @param values [Hash{Integer=>Object}] offset => desired level
+    #               (:active/:inactive/1/0/true/false). Offsets must be a subset
+    #               of #offsets.
+    # @raise [ArgumentError] when values is not a Hash
+    # @raise [SystemCallError] on error
+    def set_values(values)
+      assert_active!
+      unless values.is_a?(Hash)
+        raise ArgumentError, "set_values expects a Hash of offset => value, got #{values.class}"
+      end
+      return if values.empty?
+
+      offs = values.keys
+      vals = values.values.map { |v| normalize_value(v) }
+      offsets_ptr = Native.uint32_buffer(offs)
+      values_ptr  = Native.int_buffer(vals)
+      ret = Native.gpiod_line_request_set_values_subset(@request_ptr, offs.size, offsets_ptr, values_ptr)
+      raise SystemCallError.new("gpiod_line_request_set_values_subset", Native.errno) if ret == -1
+    end
+
     # Wait for edge events on any line in this request.
     #
     # @param timeout [Float, nil] seconds to wait; nil = block indefinitely;
@@ -128,6 +173,15 @@ module Rgpio
       when :active,   1, true  then Native::LINE_VALUE_ACTIVE
       when :inactive, 0, false then Native::LINE_VALUE_INACTIVE
       else raise ArgumentError, "Unknown line value: #{value.inspect}"
+      end
+    end
+
+    def decode_value(int, offset)
+      case int
+      when Native::LINE_VALUE_ACTIVE   then :active
+      when Native::LINE_VALUE_INACTIVE then :inactive
+      else
+        raise SystemCallError.new("gpiod_line_request_get_values_subset(offset=#{offset})", Native.errno)
       end
     end
   end

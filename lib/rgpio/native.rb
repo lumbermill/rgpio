@@ -48,6 +48,33 @@ module Rgpio
       ptr
     end
 
+    # Allocate a native buffer holding an array of C ints, e.g. an array of
+    # `enum gpiod_line_value` for gpiod_line_request_set_values_subset.
+    # @param values [Array<Integer>]
+    # @return [Fiddle::Pointer]
+    def self.int_buffer(values)
+      packed = values.pack("l*")
+      ptr = Fiddle::Pointer.malloc(packed.bytesize, Fiddle::RUBY_FREE)
+      ptr[0, packed.bytesize] = packed
+      ptr
+    end
+
+    # Allocate an uninitialised buffer sized for `count` C ints, for use as an
+    # output parameter (e.g. gpiod_line_request_get_values_subset).
+    # @param count [Integer]
+    # @return [Fiddle::Pointer]
+    def self.int_output_buffer(count)
+      Fiddle::Pointer.malloc(count * Fiddle::SIZEOF_INT, Fiddle::RUBY_FREE)
+    end
+
+    # Read `count` C ints back out of a buffer into a Ruby Array.
+    # @param ptr [Fiddle::Pointer]
+    # @param count [Integer]
+    # @return [Array<Integer>]
+    def self.read_int_buffer(ptr, count)
+      ptr[0, count * Fiddle::SIZEOF_INT].unpack("l*")
+    end
+
     if LIBRARY_AVAILABLE
       # -----------------------------------------------------------------------
       # Direction enum values (gpiod_line_direction)
@@ -145,6 +172,11 @@ module Rgpio
       extern "int gpiod_line_request_get_value(void *request, unsigned int offset)"
       # Returns 0 on success, -1 on error
       extern "int gpiod_line_request_set_value(void *request, unsigned int offset, int value)"
+      # Atomic multi-line I/O over a subset of the requested offsets.
+      # offsets: uint32 buffer; values: int buffer of enum gpiod_line_value.
+      # Both return 0 on success, -1 on error.
+      extern "int gpiod_line_request_get_values_subset(void *request, size_t num_values, void *offsets, void *values)"
+      extern "int gpiod_line_request_set_values_subset(void *request, size_t num_values, void *offsets, void *values)"
 
       # -----------------------------------------------------------------------
       # Edge event waiting / reading
