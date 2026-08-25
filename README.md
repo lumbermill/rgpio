@@ -4,7 +4,9 @@ Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/lib
 
 Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1).
 
-> **Phase 1 status:** Raspberry Pi 5 only. Pi 4 / Pi Zero support is planned for Phase 2.
+> **Status:** Verified on Raspberry Pi 5. Multi-board support, the roadmap, and
+> planned APIs are tracked in [PLAN.md](PLAN.md); released changes are recorded in
+> [CHANGELOG.md](CHANGELOG.md).
 
 ## Why libgpiod?
 
@@ -16,8 +18,8 @@ Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi,
 
 ## Requirements
 
-- **OS:** Debian Trixie (13) or later — verified target. Bookworm may work but ships libgpiod 1.x which is not supported.
-- **Hardware:** Raspberry Pi 5 (Phase 1)
+- **OS:** Debian Trixie (13) or later — verified target. Bookworm ships libgpiod 1.x, which is not supported.
+- **Hardware:** Raspberry Pi 5 (verified). Other Pi models: see [PLAN.md](PLAN.md).
 - **Library:** `libgpiod2` (>= 2.1)
 - **Ruby:** >= 3.4 (CRuby)
 
@@ -57,9 +59,8 @@ gem install rgpio
 require "rgpio"
 
 # Block form ensures the chip is closed on exit.
-# With no path, the header GPIO controller is auto-detected, so the same
-# code runs unchanged on Pi 5 / Pi 4 / Pi Zero (pass "/dev/gpiochipN" to
-# select one explicitly).
+# With no path, the 40-pin header GPIO controller is auto-detected by label
+# (pass "/dev/gpiochipN" to select one explicitly).
 Rgpio::Chip.open do |chip|
   puts chip.path        # "/dev/gpiochip0"
   puts chip.label       # "pinctrl-rp1" on Pi 5
@@ -158,10 +159,6 @@ To enable two channels simultaneously (e.g. GPIO18 + GPIO19):
 ```
 dtoverlay=pwm-2chan,pin=18,func=2,pin2=19,func2=2
 ```
-
-> **Note:** The exact overlay parameters for Pi 5 depend on your kernel version.
-> If the above does not work, check `/boot/firmware/overlays/README` on the Pi
-> for the definitive parameter list.
 
 **Without rebooting** (volatile, for quick testing) you can load the same
 overlay at runtime — pass the parameters space-separated instead of as a CSV:
@@ -286,6 +283,8 @@ sudo ruby examples/servo.rb
 |---|---|
 | `#get_value(offset)` | `:active` or `:inactive` |
 | `#set_value(offset, value)` | Set output level |
+| `#get_values(offsets = all)` | Read several lines atomically → `{offset => :active/:inactive}` |
+| `#set_values(hash)` | Write several lines atomically from `{offset => value}` |
 | `#wait_edge_events(timeout:)` | `true` if event ready |
 | `#read_edge_events(timeout:, capacity:)` | Array of event hashes |
 | `#release` | Release kernel request |
@@ -310,8 +309,6 @@ sudo ruby examples/servo.rb
 
 ```
 ┌─────────────────────────────────────────┐
-│  High-level API (Phase 3, future gem)   │  LED, Button, Servo classes
-├─────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────────┤
 │  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
@@ -321,17 +318,16 @@ sudo ruby examples/servo.rb
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`)** — Ruby-idiomatic wrappers
-- **Layer 3 (Phase 3)** — high-level gpiozero-style API (planned as a separate gem)
+
+A high-level, gpiozero-style API (`LED`, `Button`, `PWMLED`, …) is planned; see
+[PLAN.md](PLAN.md).
 
 ---
 
-## Roadmap
+## Project status
 
-| Phase | Scope |
-|---|---|
-| **1** | Pi 5, GPIO I/O + hardware PWM ✅ |
-| **2 (current)** | Auto-detect gpiochip by label ✅; Pi 4 / Pi Zero hardware validation (pending hardware) |
-| **3** | High-level API: `LED`, `Button`, `PWMLED`, … (separate gem) |
+- **Released changes:** [CHANGELOG.md](CHANGELOG.md)
+- **Roadmap, planned APIs, and multi-board validation status:** [PLAN.md](PLAN.md)
 
 ---
 
