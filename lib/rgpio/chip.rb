@@ -44,9 +44,9 @@ module Rgpio
       Rgpio.assert_available!
       @path = path || self.class.detect_path
       @chip_ptr = Native.gpiod_chip_open(@path)
-      if @chip_ptr.null?
-        raise SystemCallError.new("gpiod_chip_open(#{@path})", Native.errno)
-      end
+      return unless @chip_ptr.null?
+
+      raise SystemCallError.new("gpiod_chip_open(#{@path})", Native.errno)
     end
 
     # Open a chip, yield it to the block, then close it.
@@ -160,14 +160,14 @@ module Rgpio
         check! Native.gpiod_line_settings_set_bias(settings_ptr, bias_value(bias)),
                "gpiod_line_settings_set_bias"
         Native.gpiod_line_settings_set_active_low(settings_ptr, active_low)
-        if debounce_us && debounce_us > 0
+        if debounce_us&.positive?
           check! Native.gpiod_line_settings_set_debounce_period_us(settings_ptr, debounce_us),
                  "gpiod_line_settings_set_debounce_period_us"
         end
         if direction == :output
           check! Native.gpiod_line_settings_set_output_value(
-                   settings_ptr, initial_value == :active ? Native::LINE_VALUE_ACTIVE : Native::LINE_VALUE_INACTIVE
-                 ), "gpiod_line_settings_set_output_value"
+            settings_ptr, initial_value == :active ? Native::LINE_VALUE_ACTIVE : Native::LINE_VALUE_INACTIVE
+          ), "gpiod_line_settings_set_output_value"
         end
 
         line_config_ptr = Native.gpiod_line_config_new
@@ -178,15 +178,14 @@ module Rgpio
           offsets_ptr = Native.uint32_buffer(offsets_arr)
 
           check! Native.gpiod_line_config_add_line_settings(
-                   line_config_ptr, offsets_ptr, offsets_arr.size, settings_ptr
-                 ), "gpiod_line_config_add_line_settings"
+            line_config_ptr, offsets_ptr, offsets_arr.size, settings_ptr
+          ), "gpiod_line_config_add_line_settings"
 
           req_config_ptr = build_request_config(consumer)
           begin
             request_ptr = Native.gpiod_chip_request_lines(@chip_ptr, req_config_ptr, line_config_ptr)
-            if request_ptr.null?
-              raise SystemCallError.new("gpiod_chip_request_lines", Native.errno)
-            end
+            raise SystemCallError.new("gpiod_chip_request_lines", Native.errno) if request_ptr.null?
+
             LineRequest.new(request_ptr, offsets_arr)
           ensure
             Native.gpiod_request_config_free(req_config_ptr) unless req_config_ptr.null?
@@ -203,6 +202,7 @@ module Rgpio
     # Safe to call multiple times.
     def close
       return unless @chip_ptr && !@chip_ptr.null?
+
       Native.gpiod_chip_close(@chip_ptr)
       @chip_ptr = nil
     end
@@ -221,6 +221,7 @@ module Rgpio
       assert_open!
       info = Native.gpiod_chip_get_info(@chip_ptr)
       raise SystemCallError.new("gpiod_chip_get_info", Native.errno) if info.null?
+
       begin
         yield info
       ensure
@@ -231,6 +232,7 @@ module Rgpio
     def build_request_config(consumer)
       ptr = Native.gpiod_request_config_new
       return Native::NULL if ptr.null?
+
       Native.gpiod_request_config_set_consumer(ptr, consumer) if consumer
       ptr
     end

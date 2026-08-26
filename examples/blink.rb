@@ -26,9 +26,9 @@ Rgpio::Chip.open do |chip|
   puts "Chip: #{chip.path} #{chip.label} (#{chip.num_lines} lines)"
 
   request = chip.request_lines(
-    offsets:   [GPIO_LED],
+    offsets: [GPIO_LED],
     direction: :output,
-    consumer:  "rgpio-blink"
+    consumer: "rgpio-blink"
   )
 
   begin

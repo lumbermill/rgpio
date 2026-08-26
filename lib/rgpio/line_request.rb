@@ -73,9 +73,7 @@ module Rgpio
       raise SystemCallError.new("gpiod_line_request_get_values_subset", Native.errno) if ret == -1
 
       raw = Native.read_int_buffer(values_ptr, offs.size)
-      offs.each_with_index.each_with_object({}) do |(offset, i), out|
-        out[offset] = decode_value(raw[i], offset)
-      end
+      offs.zip(raw).to_h { |offset, value| [offset, decode_value(value, offset)] }
     end
 
     # Set several output lines atomically in a single ioctl.
@@ -87,9 +85,7 @@ module Rgpio
     # @raise [SystemCallError] on error
     def set_values(values)
       assert_active!
-      unless values.is_a?(Hash)
-        raise ArgumentError, "set_values expects a Hash of offset => value, got #{values.class}"
-      end
+      raise ArgumentError, "set_values expects a Hash of offset => value, got #{values.class}" unless values.is_a?(Hash)
       return if values.empty?
 
       offs = values.keys
@@ -115,6 +111,7 @@ module Rgpio
                    end
       ret = Native.gpiod_line_request_wait_edge_events(@request_ptr, timeout_ns)
       raise SystemCallError.new("gpiod_line_request_wait_edge_events", Native.errno) if ret == -1
+
       ret == 1
     end
 
@@ -141,9 +138,9 @@ module Rgpio
           ev = Native.gpiod_edge_event_buffer_get_event(buf, i)
           type_int = Native.gpiod_edge_event_get_event_type(ev)
           {
-            type:         type_int == Native::EDGE_EVENT_RISING_EDGE ? :rising : :falling,
-            offset:       Native.gpiod_edge_event_get_line_offset(ev),
-            timestamp_ns: Native.gpiod_edge_event_get_timestamp_ns(ev)
+            type: type_int == Native::EDGE_EVENT_RISING_EDGE ? :rising : :falling,
+            offset: Native.gpiod_edge_event_get_line_offset(ev),
+            timestamp_ns: Native.gpiod_edge_event_get_timestamp_ns(ev),
           }
         end
       ensure
@@ -154,6 +151,7 @@ module Rgpio
     # Release the kernel line request. Safe to call multiple times.
     def release
       return unless @request_ptr && !@request_ptr.null?
+
       Native.gpiod_line_request_release(@request_ptr)
       @request_ptr = nil
     end

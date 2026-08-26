@@ -42,7 +42,7 @@ module Rgpio
       12 => 0,
       13 => 1,
       18 => 2,
-      19 => 3
+      19 => 3,
     }.freeze
 
     # @param gpio    [Integer, nil] GPIO line offset to look up chip/channel
@@ -54,7 +54,7 @@ module Rgpio
         channel = GPIO_TO_PWM_CHANNEL_PI5.fetch(gpio) do
           raise ArgumentError,
                 "GPIO#{gpio} is not a hardware PWM pin on Pi 5. " \
-                "Valid pins: #{GPIO_TO_PWM_CHANNEL_PI5.keys.join(', ')}"
+                "Valid pins: #{GPIO_TO_PWM_CHANNEL_PI5.keys.join(", ")}"
         end
         chip = :auto
       end
@@ -72,8 +72,8 @@ module Rgpio
     end
 
     # Open a PWM channel, yield it, then close it (disable + unexport).
-    def self.open(**kwargs, &block)
-      pwm = new(**kwargs)
+    def self.open(**, &block)
+      pwm = new(**)
       block.call(pwm)
     ensure
       pwm&.close
@@ -96,15 +96,14 @@ module Rgpio
       end
       write_sysfs("period", new_period_ns)
       # Restore duty cycle ratio
-      if @period_ns && @duty_ratio
-        write_sysfs("duty_cycle", (@duty_ratio * new_period_ns).round)
-      end
+      write_sysfs("duty_cycle", (@duty_ratio * new_period_ns).round) if @period_ns && @duty_ratio
       @period_ns = new_period_ns
     end
 
     # @return [Numeric, nil] current frequency in Hz, or nil if period not set
     def frequency
-      return nil unless @period_ns && @period_ns > 0
+      return nil unless @period_ns&.positive?
+
       1_000_000_000.0 / @period_ns
     end
 
@@ -113,6 +112,7 @@ module Rgpio
     # @param ratio [Float] 0.0 = always off, 1.0 = always on
     def duty_cycle=(ratio)
       raise PWMError, "Set frequency= before duty_cycle=" unless @period_ns
+
       ratio = ratio.clamp(0.0, 1.0)
       @duty_ratio = ratio
       write_sysfs("duty_cycle", (@duty_ratio * @period_ns).round)
@@ -126,6 +126,7 @@ module Rgpio
     # @param us [Numeric] pulse width in microseconds
     def pulse_width_us=(us)
       raise PWMError, "Set frequency= before pulse_width_us=" unless @period_ns
+
       ns = (us * 1000).round
       @duty_ratio = ns.to_f / @period_ns
       write_sysfs("duty_cycle", ns)
@@ -134,6 +135,7 @@ module Rgpio
     # @return [Float, nil] current pulse width in microseconds
     def pulse_width_us
       return nil unless @period_ns && @duty_ratio
+
       (@duty_ratio * @period_ns / 1000.0).round(3)
     end
 
@@ -157,6 +159,7 @@ module Rgpio
     # Safe to call multiple times.
     def close
       return unless @exported
+
       disable rescue nil
       unexport_channel
       @exported = false
@@ -172,7 +175,7 @@ module Rgpio
     # List all available PWM chips with their number of channels.
     # @return [Array<Hash>] [{ chip: Integer, npwm: Integer, path: String }, ...]
     def self.available_chips
-      Dir.glob("#{PWM_SYSFS_ROOT}/pwmchip*").sort.filter_map do |path|
+      Dir.glob("#{PWM_SYSFS_ROOT}/pwmchip*").filter_map do |path|
         npwm = Integer(File.read(File.join(path, "npwm")).strip, 10) rescue next
         chip_num = File.basename(path).delete_prefix("pwmchip").to_i
         { chip: chip_num, npwm: npwm, path: path }
@@ -197,8 +200,10 @@ module Rgpio
     # Raises PWMError if no chip can be found.
     def detect_rp1_pwm_chip!
       chips = self.class.available_chips
-      raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
-                      "Is the dtoverlay configured? See README.md." if chips.empty?
+      if chips.empty?
+        raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
+                        "Is the dtoverlay configured? See README.md."
+      end
 
       # Strategy 1: RP1 PWM0 device address in sysfs symlink path
       rp1_candidate = chips.find do |c|
@@ -223,12 +228,14 @@ module Rgpio
 
     def export_channel
       return if File.exist?(@channel_path)
+
       File.write(File.join(@chip_path, "export"), @channel.to_s)
       wait_for_channel_path!
       @exported = true
     rescue Errno::EBUSY
       # Already exported by a previous run that did not unexport cleanly.
       raise unless File.exist?(@channel_path)
+
       @exported = true
     end
 
@@ -246,6 +253,7 @@ module Rgpio
       deadline = Time.now + 3.0
       until File.writable?(period_path)
         raise PWMError, "Timeout: #{period_path} did not become writable after export" if Time.now > deadline
+
         sleep 0.02
       end
     end

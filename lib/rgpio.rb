@@ -43,6 +43,7 @@ module Rgpio
   # Raise NotAvailableError unless libgpiod is loaded.
   def self.assert_available!
     return if available?
+
     raise NotAvailableError,
           "libgpiod shared library not found. " \
           "Install on Debian/Raspbian: sudo apt install libgpiod3"
@@ -51,6 +52,7 @@ module Rgpio
   # @return [String, nil] libgpiod version string (e.g. "2.1.3"), or nil if unavailable
   def self.version
     return nil unless available?
+
     Native.gpiod_api_version
   end
 end

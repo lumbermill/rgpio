@@ -35,3 +35,20 @@ jobs:
 
       - name: Run tests
         run: rake test
+
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+
+      - name: Install RuboCop
+        run: gem install --no-document rubocop -v "~> 1.90"
+
+      - name: Run RuboCop
+        run: rubocop --format github

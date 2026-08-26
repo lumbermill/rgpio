@@ -27,12 +27,12 @@ Rgpio::Chip.open do |chip|
   puts "Chip: #{chip.path} #{chip.label}"
 
   request = chip.request_lines(
-    offsets:    [GPIO_BUTTON],
-    direction:  :input,
-    edge:       :both,      # エッジ検出を有効にしてカーネルが値を更新し続けるようにする
-    bias:       :pull_up,
+    offsets: [GPIO_BUTTON],
+    direction: :input,
+    edge: :both, # エッジ検出を有効にしてカーネルが値を更新し続けるようにする
+    bias: :pull_up,
     active_low: true,
-    consumer:   "rgpio-button"
+    consumer: "rgpio-button"
   )
 
   # エッジイベントで「変化があった」と気付き、get_valueで「実際の状態」を読む。

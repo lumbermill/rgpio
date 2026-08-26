@@ -1,0 +1,68 @@
+AllCops:
+  TargetRubyVersion: 3.4
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "vendor/**/*"
+
+# The codebase uses trailing commas in multiline collections; keep them.
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: consistent_comma
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: consistent_comma
+
+# The library is written with double quotes throughout; match it.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# get_value(s) / set_value(s) deliberately mirror the libgpiod C API names.
+Naming/AccessorMethodName:
+  Enabled: false
+
+# Allow domain abbreviations such as `hz` and `us`.
+Naming/MethodParameterName:
+  MinNameLength: 2
+
+# Hardware identifiers (bcm2711, rp1, uint32, int32) are not "numbered vars".
+Naming/VariableNumber:
+  Enabled: false
+
+# Terse `expr rescue fallback` is used intentionally for optional sysfs reads.
+Style/RescueModifier:
+  Enabled: false
+
+# Low-level binding code has legitimately long methods and a long Native module.
+Metrics/MethodLength:
+  Max: 45
+Metrics/AbcSize:
+  Max: 40
+Metrics/CyclomaticComplexity:
+  Max: 12
+Metrics/PerceivedComplexity:
+  Max: 12
+Metrics/ClassLength:
+  Max: 220
+Metrics/ModuleLength:
+  Max: 260
+
+# request_lines is an options-style API; keyword args should not count here.
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*"
+    - "examples/**/*"
+    - "*.gemspec"
+
+# wait_edge_events mirrors the libgpiod C call: it blocks/waits and reports
+# readiness; it is an action, not a pure predicate, so no `?` suffix.
+Naming/PredicateMethod:
+  AllowedMethods:
+    - wait_edge_events
+
+# Development dependencies are declared in the gemspec by choice.
+Gemspec/DevelopmentDependencies:
+  Enabled: false

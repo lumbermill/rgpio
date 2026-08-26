@@ -40,7 +40,7 @@ def sweep(pwm, from_us, to_us, step_us, delay)
   steps = ((to_us - from_us) / step_us.to_f).ceil.abs
   direction = to_us > from_us ? 1 : -1
   steps.times do |i|
-    pwm.pulse_width_us = from_us + direction * i * step_us
+    pwm.pulse_width_us = from_us + (direction * i * step_us)
     sleep delay
   end
   pwm.pulse_width_us = to_us
@@ -54,7 +54,7 @@ puts "Driving servo on GPIO#{SERVO_GPIO} at #{FREQUENCY_HZ} Hz."
 Rgpio::HardwarePWM.open(gpio: SERVO_GPIO) do |pwm|
   puts "Using pwmchip#{pwm.chip_num}, channel #{pwm.channel}"
   pwm.frequency  = FREQUENCY_HZ
-  pwm.duty_cycle = 0.0  # start with duty=0 before enabling
+  pwm.duty_cycle = 0.0 # start with duty=0 before enabling
   pwm.enable
 
   # Move to center first
