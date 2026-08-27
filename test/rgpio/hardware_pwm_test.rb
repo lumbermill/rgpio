@@ -49,7 +49,7 @@ class HardwarePWMTest < Minitest::Test
   def pwm_for_gpio18
     add_chip(num: 2, npwm: 4, rp1_address: "1f00098000")
     add_channel(chip_num: 2, channel: 2)
-    Rgpio::HardwarePWM.new(gpio: 18)
+    Rgpio::HardwarePWM.new(gpio: 18, board: :pi5)
   end
 
   # ------------------------------------------------------------------ #
@@ -64,7 +64,7 @@ class HardwarePWMTest < Minitest::Test
   # .new argument validation
 
   def test_new_gpio_invalid_raises_argument_error
-    err = assert_raises(ArgumentError) { Rgpio::HardwarePWM.new(gpio: 17) }
+    err = assert_raises(ArgumentError) { Rgpio::HardwarePWM.new(gpio: 17, board: :pi5) }
     assert_match(/GPIO17.*not a hardware PWM pin/, err.message)
   end
 
@@ -97,7 +97,7 @@ class HardwarePWMTest < Minitest::Test
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 4, rp1_address: "1f00098000")
     add_channel(chip_num: 2, channel: 2)
-    pwm = Rgpio::HardwarePWM.new(gpio: 18)
+    pwm = Rgpio::HardwarePWM.new(gpio: 18, board: :pi5)
     assert_equal 2, pwm.chip_num
   end
 
@@ -105,27 +105,86 @@ class HardwarePWMTest < Minitest::Test
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 4)
     add_channel(chip_num: 2, channel: 0)
-    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0, board: :pi5)
     assert_equal 2, pwm.chip_num
   end
 
   def test_detect_strategy3_single_chip
     add_chip(num: 3, npwm: 2)
     add_channel(chip_num: 3, channel: 0)
-    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0, board: :pi5)
     assert_equal 3, pwm.chip_num
   end
 
   def test_detect_no_chips_raises_pwm_error
-    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0) }
+    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0, board: :pi5) }
     assert_match(/No PWM chips found/, err.message)
   end
 
   def test_detect_ambiguous_raises_pwm_error
     add_chip(num: 0, npwm: 2)
     add_chip(num: 2, npwm: 2)
-    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0) }
+    err = assert_raises(Rgpio::PWMError) { Rgpio::HardwarePWM.new(chip: :auto, channel: 0, board: :pi5) }
     assert_match(/Cannot auto-detect.*pwmchip/, err.message)
+  end
+
+  # ------------------------------------------------------------------ #
+  # Board detection (device-tree model)
+
+  def test_detect_board_pi5
+    assert_equal :pi5, Rgpio::HardwarePWM.detect_board("Raspberry Pi 5 Model B Rev 1.0")
+  end
+
+  def test_detect_board_pi4_variants
+    assert_equal :pi4, Rgpio::HardwarePWM.detect_board("Raspberry Pi 4 Model B Rev 1.4")
+    assert_equal :pi4, Rgpio::HardwarePWM.detect_board("Raspberry Pi 400 Rev 1.0")
+    assert_equal :pi4, Rgpio::HardwarePWM.detect_board("Raspberry Pi Compute Module 4 Rev 1.0")
+  end
+
+  def test_detect_board_unknown
+    assert_equal :unknown, Rgpio::HardwarePWM.detect_board("Raspberry Pi 3 Model B Plus Rev 1.3")
+    assert_equal :unknown, Rgpio::HardwarePWM.detect_board("")
+  end
+
+  # ------------------------------------------------------------------ #
+  # Pi 4 (BCM2711) mapping and detection
+
+  def test_gpio_to_pwm_channel_pi4_mapping
+    assert_equal({ 12 => 0, 13 => 1, 18 => 0, 19 => 1 },
+                 Rgpio::HardwarePWM::GPIO_TO_PWM_CHANNEL[:pi4])
+  end
+
+  def test_pi4_gpio18_maps_channel0
+    add_chip(num: 0, npwm: 2, rp1_address: "fe20c000")
+    add_channel(chip_num: 0, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(gpio: 18, board: :pi4)
+    assert_equal :pi4, pwm.board
+    assert_equal 0, pwm.chip_num
+    assert_equal 0, pwm.channel
+  end
+
+  def test_pi4_gpio13_maps_channel1
+    add_chip(num: 0, npwm: 2, rp1_address: "fe20c000")
+    add_channel(chip_num: 0, channel: 1)
+    pwm = Rgpio::HardwarePWM.new(gpio: 13, board: :pi4)
+    assert_equal 1, pwm.channel
+  end
+
+  def test_pi4_detect_by_npwm_when_no_address
+    add_chip(num: 0, npwm: 2)
+    add_channel(chip_num: 0, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(chip: :auto, channel: 0, board: :pi4)
+    assert_equal 0, pwm.chip_num
+  end
+
+  def test_pi4_gpio_invalid_raises
+    err = assert_raises(ArgumentError) { Rgpio::HardwarePWM.new(gpio: 17, board: :pi4) }
+    assert_match(/GPIO17.*not a hardware PWM pin/, err.message)
+  end
+
+  def test_unknown_board_gpio_raises
+    err = assert_raises(ArgumentError) { Rgpio::HardwarePWM.new(gpio: 18, board: :unknown) }
+    assert_match(/mapping is unknown for board/, err.message)
   end
 
   # ------------------------------------------------------------------ #

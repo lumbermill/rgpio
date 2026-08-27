@@ -36,38 +36,58 @@ module Rgpio
   class HardwarePWM
     PWM_SYSFS_ROOT = "/sys/class/pwm"
 
-    # GPIO offset → [pwm_chip_label_hint, channel] for Raspberry Pi 5 (RP1).
-    # The chip number is resolved at runtime via auto-detection.
-    GPIO_TO_PWM_CHANNEL_PI5 = {
-      12 => 0,
-      13 => 1,
-      18 => 2,
-      19 => 3,
+    # Device-tree model string, used to pick the board's PWM mapping.
+    BOARD_MODEL_PATH = "/proc/device-tree/model"
+
+    # GPIO offset → PWM channel, per board family. The pwmchip *number* is
+    # resolved separately at runtime (see {PWM_CHIP_PROFILE}).
+    #
+    #   Pi 5 (RP1):     GPIO12/13/18/19 → channels 0/1/2/3 (one 4-channel chip)
+    #   Pi 4 (BCM2711): GPIO12/18 → channel 0 (PWM0), GPIO13/19 → channel 1 (PWM1)
+    GPIO_TO_PWM_CHANNEL = {
+      pi5: { 12 => 0, 13 => 1, 18 => 2, 19 => 3 }.freeze,
+      pi4: { 12 => 0, 13 => 1, 18 => 0, 19 => 1 }.freeze,
+    }.freeze
+
+    # Backwards-compatible alias for the Pi 5 mapping.
+    GPIO_TO_PWM_CHANNEL_PI5 = GPIO_TO_PWM_CHANNEL[:pi5]
+
+    # Hints for locating the header PWM chip in sysfs, per board family:
+    #   address — substring of the chip's device symlink (the peripheral the
+    #             40-pin header PWM pins route to)
+    #   npwm    — channel count of that chip
+    # Pi 5 (RP1 PWM0 at 1f00098000, 4 channels) is verified. Pi 4 (BCM2711 PWM0
+    # at fe20c000, 2 channels) is provisional, pending hardware validation
+    # (see PLAN.md).
+    PWM_CHIP_PROFILE = {
+      pi5: { address: "1f00098000", npwm: 4 }.freeze,
+      pi4: { address: "fe20c000",   npwm: 2 }.freeze,
     }.freeze
 
     # @param gpio    [Integer, nil] GPIO line offset to look up chip/channel
-    #                              automatically (Pi 5 only). Takes priority.
-    # @param chip    [Integer, :auto] pwmchip number, or :auto to detect RP1
+    #                 automatically. Takes priority over chip:/channel:.
+    # @param chip    [Integer, :auto] pwmchip number, or :auto to detect the
+    #                 header PWM chip for the current board.
     # @param channel [Integer] PWM channel number within the chip
-    def initialize(gpio: nil, chip: :auto, channel: 0)
+    # @param board   [:auto, :pi5, :pi4] board family for the gpio: mapping and
+    #                 chip auto-detection. :auto reads the device-tree model.
+    def initialize(gpio: nil, chip: :auto, channel: 0, board: :auto)
+      @board = board == :auto ? self.class.detect_board : board
+
       if gpio
-        channel = GPIO_TO_PWM_CHANNEL_PI5.fetch(gpio) do
-          raise ArgumentError,
-                "GPIO#{gpio} is not a hardware PWM pin on Pi 5. " \
-                "Valid pins: #{GPIO_TO_PWM_CHANNEL_PI5.keys.join(", ")}"
-        end
+        channel = gpio_channel(gpio)
         chip = :auto
       end
 
       @channel = channel
-      @chip_num = chip == :auto ? detect_rp1_pwm_chip! : chip
+      @chip_num = chip == :auto ? detect_pwm_chip! : chip
       @chip_path    = "#{PWM_SYSFS_ROOT}/pwmchip#{@chip_num}"
       @channel_path = File.join(@chip_path, "pwm#{@channel}")
 
       raise PWMError, "PWM chip not found: #{@chip_path}" unless File.exist?(@chip_path)
 
-      @period_ns    = nil
-      @exported     = false
+      @period_ns = nil
+      @exported  = false
       export_channel
     end
 
@@ -84,6 +104,9 @@ module Rgpio
 
     # @return [Integer] channel number within the chip
     attr_reader :channel
+
+    # @return [:pi5, :pi4, :unknown] resolved board family
+    attr_reader :board
 
     # Set PWM frequency in Hz.
     # Updates period_ns; preserves duty cycle ratio if already set.
@@ -167,7 +190,7 @@ module Rgpio
 
     # Return a human-readable description of this PWM instance.
     def inspect
-      "#<Rgpio::HardwarePWM chip=#{@chip_num} channel=#{@channel} " \
+      "#<Rgpio::HardwarePWM board=#{@board} chip=#{@chip_num} channel=#{@channel} " \
         "freq=#{frequency&.round(2)}Hz duty=#{@duty_ratio&.round(4)} " \
         "enabled=#{enabled?}>"
     end
@@ -182,48 +205,77 @@ module Rgpio
       end
     end
 
+    # Detect the Raspberry Pi board family from the device-tree model string.
+    # @return [:pi5, :pi4, :unknown]
+    def self.detect_board(model = board_model)
+      case model
+      when /Raspberry Pi 5/ then :pi5
+      when /Raspberry Pi (?:4|400)/, /Compute Module 4/ then :pi4
+      else :unknown
+      end
+    end
+
+    # @return [String] the device-tree model string ("" when unavailable)
+    def self.board_model
+      File.read(BOARD_MODEL_PATH, encoding: "BINARY").delete("\0").strip
+    rescue SystemCallError
+      ""
+    end
+
     private
 
-    # Detect the RP1 PWM chip on Raspberry Pi 5.
+    # Look up the PWM channel for a header GPIO on the resolved board.
+    def gpio_channel(gpio)
+      table = GPIO_TO_PWM_CHANNEL.fetch(@board) do
+        raise ArgumentError,
+              "Hardware PWM gpio: mapping is unknown for board #{@board.inspect}. " \
+              "Pass board: :pi5 / :pi4, or chip:/channel: explicitly."
+      end
+      table.fetch(gpio) do
+        raise ArgumentError,
+              "GPIO#{gpio} is not a hardware PWM pin on #{@board}. " \
+              "Valid pins: #{table.keys.join(", ")}"
+      end
+    end
+
+    # Resolve the pwmchip number of the header PWM controller for @board.
     #
     # Strategy (in order of preference):
-    #   1. Chip whose sysfs device symlink path is the RP1 PWM0 instance
-    #      (address 1f00098000). This is the peripheral the 40-pin header
-    #      pins route to: GPIO12/13/18/19 = PWM0_CHAN0..3 (verified via
-    #      `pinctrl funcs`).
-    #      NOTE: RP1 also has a PWM1 instance (1f0009c000) which is enabled by
-    #      default (fan) and ALSO reports npwm == 4 but is not wired to the
-    #      header — so this address match is required to avoid selecting it.
-    #   2. Chip with npwm == 4 (fallback when only one PWM instance is present).
+    #   1. Chip whose sysfs device symlink contains the board's PWM address.
+    #      On Pi 5 the RP1 also exposes a PWM1 instance (1f0009c000, fan) that
+    #      ALSO reports npwm == 4 but is not on the header, so this address
+    #      match is required to avoid selecting it.
+    #   2. Chip whose channel count matches the board profile.
     #   3. The only chip present.
     #
-    # Raises PWMError if no chip can be found.
-    def detect_rp1_pwm_chip!
+    # Raises PWMError when no chip can be chosen.
+    def detect_pwm_chip!
       chips = self.class.available_chips
       if chips.empty?
         raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
                         "Is the dtoverlay configured? See README.md."
       end
 
-      # Strategy 1: RP1 PWM0 device address in sysfs symlink path
-      rp1_candidate = chips.find do |c|
-        device_link = File.readlink(c[:path]) rescue ""
-        device_link.include?("1f00098000")
+      profile = PWM_CHIP_PROFILE[@board]
+      if profile
+        by_address = chips.find do |c|
+          device_link = File.readlink(c[:path]) rescue ""
+          device_link.include?(profile[:address])
+        end
+        return by_address[:chip] if by_address
+
+        by_npwm = chips.find { |c| c[:npwm] == profile[:npwm] }
+        return by_npwm[:chip] if by_npwm
       end
-      return rp1_candidate[:chip] if rp1_candidate
 
-      # Strategy 2: chip with 4 PWM channels (RP1 GPIO-header PWM)
-      four_ch = chips.find { |c| c[:npwm] == 4 }
-      return four_ch[:chip] if four_ch
-
-      # Strategy 3: only one chip available
+      # Only one chip present — unambiguous.
       return chips.first[:chip] if chips.size == 1
 
-      # Cannot determine — require explicit chip: argument
+      # Cannot determine — require explicit chip: argument.
       chip_list = chips.map { |c| "pwmchip#{c[:chip]}(npwm=#{c[:npwm]})" }.join(", ")
       raise PWMError,
-            "Cannot auto-detect RP1 PWM chip. Available: #{chip_list}. " \
-            "Pass chip: <number> explicitly (see README.md)."
+            "Cannot auto-detect the header PWM chip for board #{@board.inspect}. " \
+            "Available: #{chip_list}. Pass chip: <number> explicitly (see README.md)."
     end
 
     def export_channel

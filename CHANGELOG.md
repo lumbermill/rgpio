@@ -28,6 +28,10 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   `enable`/`disable`, and block-form `.open`.
 - Automatic RP1 PWM chip/channel detection on Pi 5, including `gpio:`-based
   channel lookup for GPIO12/13/18/19 and a udev-race-safe channel export.
+- Board-aware hardware PWM: `HardwarePWM.detect_board` reads the device-tree
+  model, and `.new(gpio:, board:)` maps header pins to channels per board.
+  Pi 5 (RP1) is verified; a Pi 4 (BCM2711) mapping is included but not yet
+  hardware-validated (see PLAN.md). `#board` exposes the resolved family.
 - `Rgpio.available?` / `.version` helpers for probing the libgpiod library.
 - Examples: `examples/blink.rb`, `examples/button.rb`, `examples/servo.rb`.
 - Minitest suite covering chip-selection logic and PWM helpers.

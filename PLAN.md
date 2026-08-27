@@ -35,8 +35,15 @@ Until validated, treat boards other than Pi 5 as best-effort.
 These extend the existing `Rgpio::*` classes and are candidates before `0.1.0`
 is published:
 
-- **Pi 4 hardware-PWM mapping** — extend the `gpio:` → chip/channel lookup
-  beyond the RP1 table so `HardwarePWM.open(gpio:)` works on Pi 4.
+- **Pi 4 hardware-PWM mapping — implemented, NEEDS HARDWARE VALIDATION.**
+  `HardwarePWM` is now board-aware: `detect_board` reads `/proc/device-tree/model`
+  and `.new(gpio:, board:)` selects the channel per board. Provisional Pi 4
+  values (unverified on hardware):
+    - gpio→channel: `GPIO12/18 → 0` (PWM0), `GPIO13/19 → 1` (PWM1).
+    - chip detection hint: device address `fe20c000` (BCM2711 PWM0), `npwm == 2`.
+  Validate on a real Pi 4: check `HardwarePWM.available_chips`, the resolved
+  `#chip_num` / `#channel` / `#board`, and that a servo on GPIO18/12/13/19
+  actually moves. Promote to README (confirmed) only once it works on hardware.
 
 ### Done
 
@@ -79,4 +86,11 @@ offer software PWM for non-PWM pins, and the callback/threading model for
   values in the README are correct for current Trixie kernels; if they change,
   the definitive list is in `/boot/firmware/overlays/README` on the Pi.
 - **PWM sysfs chip number varies by kernel version.** On Pi 5 the RP1 header PWM
-  is typically `pwmchip2`, but this is auto-detected rather than assumed.
+  is typically `pwmchip2`, but this is auto-detected rather than assumed. (On the
+  current dev Pi 5 it is actually `pwmchip0`.)
+- **Without the header PWM overlay, auto-detection can select the RP1 fan PWM.**
+  When the header PWM0 (`1f00098000`) is not enabled via dtoverlay, the only PWM
+  chip present may be the RP1 fan controller PWM1 (`1f0009c000`), which also
+  reports `npwm == 4`. `detect_pwm_chip!` prefers the header address first, but
+  falls back to `npwm == 4` and would then pick the fan chip. Enable the header
+  PWM overlay before using `HardwarePWM(gpio:)`, or pass `chip:` explicitly.

@@ -220,10 +220,19 @@ end
 
 ### Manual chip/channel specification
 
-If auto-detection fails, you can specify the chip number explicitly:
+The `gpio:` and `chip: :auto` paths detect the board from the device-tree model
+(the resolved family is available as `pwm.board`, e.g. `:pi5` on a Pi 5) and pick
+the header PWM chip and channel accordingly. If auto-detection fails, specify the
+chip number explicitly:
 
 ```ruby
 pwm = Rgpio::HardwarePWM.new(chip: 2, channel: 0)
+```
+
+You can also force the board family (e.g. when the model string is unusual):
+
+```ruby
+pwm = Rgpio::HardwarePWM.new(gpio: 18, board: :pi5)
 ```
 
 List available chips:
@@ -293,10 +302,12 @@ sudo ruby examples/servo.rb
 
 | Method | Description |
 |---|---|
-| `.new(gpio:)` | Auto-detect chip/channel for GPIO pin |
+| `.new(gpio:, board:)` | Auto-detect chip/channel for a GPIO pin (board auto-detected) |
 | `.new(chip:, channel:)` | Explicit chip/channel |
 | `.open(...) { \|pwm\| }` | Block form; closes on exit |
 | `.available_chips` | List sysfs PWM chips |
+| `.detect_board` | Board family from the device-tree model (`:pi5` / `:pi4` / `:unknown`) |
+| `#board` | Resolved board family |
 | `#frequency=` / `#frequency` | Hz |
 | `#duty_cycle=` / `#duty_ratio` | 0.0–1.0 ratio |
 | `#pulse_width_us=` / `#pulse_width_us` | Microseconds |
