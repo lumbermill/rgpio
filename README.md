@@ -4,9 +4,11 @@ Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/lib
 
 Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1).
 
-> **Status:** Verified on Raspberry Pi 5. Multi-board support, the roadmap, and
-> planned APIs are tracked in [PLAN.md](PLAN.md); released changes are recorded in
-> [CHANGELOG.md](CHANGELOG.md).
+> **Status:** GPIO + hardware PWM verified on Raspberry Pi 5; hardware PWM also
+> verified on Raspberry Pi 4. (Pi 4 GPIO needs libgpiod 2.x — i.e. Trixie — since
+> its PWM path is sysfs-only and works regardless.) Multi-board support, the
+> roadmap, and planned APIs are tracked in [PLAN.md](PLAN.md); released changes
+> are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Why libgpiod?
 
@@ -209,7 +211,11 @@ end
 # PWM is automatically disabled and unexported here
 ```
 
-### GPIO-to-PWM mapping (Pi 5 / RP1)
+### GPIO-to-PWM mapping
+
+The mapping is board-specific and auto-detected from the device-tree model.
+
+**Pi 5 (RP1)** — one 4-channel chip:
 
 | GPIO | Physical pin | RP1 PWM channel |
 |---|---|---|
@@ -217,6 +223,16 @@ end
 | GPIO13 | 33 | 1 |
 | GPIO18 | 12 | 2 |
 | GPIO19 | 35 | 3 |
+
+**Pi 4 (BCM2711)** — one 2-channel chip; the two pins on a channel are
+alternatives (use one at a time):
+
+| GPIO | Physical pin | BCM2711 PWM channel |
+|---|---|---|
+| GPIO12 | 32 | 0 (PWM0) |
+| GPIO18 | 12 | 0 (PWM0) |
+| GPIO13 | 33 | 1 (PWM1) |
+| GPIO19 | 35 | 1 (PWM1) |
 
 ### Manual chip/channel specification
 

@@ -9,7 +9,7 @@ is considered confirmed and supported; anything here is subject to change.
 | Phase | Scope | Status |
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
-| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟡 Code done; Pi 4 / Zero **hardware validation pending** |
+| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟡 Pi 4 hardware **PWM** verified; Pi 4/Zero **GPIO (libgpiod)** validation pending |
 | **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | ⬜ Not started (planned as a separate gem) |
 
 ## Multi-board support — validation status
@@ -18,39 +18,43 @@ The chip auto-detection selects the 40-pin header controller by SoC label
 (`pinctrl-rp1` → Pi 5, `pinctrl-bcm2711` → Pi 4/400, `pinctrl-bcm2835` →
 Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 
+**Validated on real hardware:**
+
+- Hardware PWM on Pi 4 (Model B Rev 1.5): board detection → `:pi4`, chip
+  detection (`fe20c000`, `npwm == 2`), `GPIO18 → channel 0`, and a full
+  export/frequency/duty round-trip. Verified 2026-08-27 (Ruby 3.4.7 via rbenv).
+
 **Not yet validated on real hardware:**
 
-- Pi 4 / Pi 400 (`pinctrl-bcm2711`) GPIO I/O and edge events.
+- Pi 4 / Pi 400 (`pinctrl-bcm2711`) GPIO I/O and edge events via libgpiod. The
+  test Pi 4 runs Debian **Bookworm**, which ships **libgpiod 1.x** (unsupported);
+  `Rgpio.available?` is `false` there. Needs a Pi 4 on Trixie (libgpiod 2.x).
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
   behaviour under load.
-- Hardware PWM on any board other than Pi 5. `HardwarePWM` currently maps
-  `gpio:` → channel using a **Pi 5 (RP1) table only**
-  (`GPIO_TO_PWM_CHANNEL_PI5`); `.new(gpio:)` raises on other boards. Pi 4 PWM
-  chip/channel mapping is not yet implemented.
 
-Until validated, treat boards other than Pi 5 as best-effort.
+Until validated, treat GPIO (libgpiod) on boards other than Pi 5 as best-effort.
 
 ## Planned API additions (current gem)
 
 These extend the existing `Rgpio::*` classes and are candidates before `0.1.0`
 is published:
 
-- **Pi 4 hardware-PWM mapping — implemented, NEEDS HARDWARE VALIDATION.**
-  `HardwarePWM` is now board-aware: `detect_board` reads `/proc/device-tree/model`
-  and `.new(gpio:, board:)` selects the channel per board. Provisional Pi 4
-  values (unverified on hardware):
-    - gpio→channel: `GPIO12/18 → 0` (PWM0), `GPIO13/19 → 1` (PWM1).
-    - chip detection hint: device address `fe20c000` (BCM2711 PWM0), `npwm == 2`.
-  Validate on a real Pi 4: check `HardwarePWM.available_chips`, the resolved
-  `#chip_num` / `#channel` / `#board`, and that a servo on GPIO18/12/13/19
-  actually moves. Promote to README (confirmed) only once it works on hardware.
+- _(none pending — see Done below)_
 
 ### Done
 
+- ~~**Pi 4 hardware-PWM mapping**~~ — board-aware `HardwarePWM`: `detect_board`
+  reads `/proc/device-tree/model`; `.new(gpio:, board:)` selects the channel per
+  board (Pi 4: `GPIO12/18 → 0`, `GPIO13/19 → 1`; chip at `fe20c000`, `npwm == 2`).
+  Verified on a real Pi 4 (2026-08-27). Now confirmed spec — see README.
 - ~~**Batch multi-line I/O**~~ — `LineRequest#get_values` / `#set_values` via
   `gpiod_line_request_get_values_subset` / `set_values_subset`. Verified on Pi 5
   hardware (atomic reads/writes and subset addressing). Now confirmed spec — see
   README.
+- ~~**Graceful libgpiod v1 handling**~~ — `require "rgpio"` used to crash when
+  only libgpiod 1.x was present (e.g. Bookworm's `libgpiod.so.2`). The loader now
+  probes for a v2 symbol and reports `Rgpio.available? == false` instead. Found
+  and fixed while validating PWM on the Bookworm Pi 4.
 
 ## Phase 3 — high-level API (future, separate gem)
 

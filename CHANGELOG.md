@@ -30,8 +30,18 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   channel lookup for GPIO12/13/18/19 and a udev-race-safe channel export.
 - Board-aware hardware PWM: `HardwarePWM.detect_board` reads the device-tree
   model, and `.new(gpio:, board:)` maps header pins to channels per board.
-  Pi 5 (RP1) is verified; a Pi 4 (BCM2711) mapping is included but not yet
-  hardware-validated (see PLAN.md). `#board` exposes the resolved family.
+  Verified on both Pi 5 (RP1) and Pi 4 (BCM2711, chip at `fe20c000`, 2 channels).
+  `#board` exposes the resolved family.
+- `examples/pwm_info.rb`: a non-destructive diagnostic that prints the detected
+  board, the PWM chips in sysfs, and which chip/channel each header GPIO resolves
+  to — without exporting anything.
+
+### Changed
+
+- `require "rgpio"` no longer crashes on systems that ship libgpiod 1.x (e.g.
+  Debian Bookworm, where it is `libgpiod.so.2`): the loader now probes for a
+  libgpiod v2 symbol and reports `Rgpio.available? == false` instead of raising
+  when only v1 is present. The sysfs-only `HardwarePWM` stays usable there.
 - `Rgpio.available?` / `.version` helpers for probing the libgpiod library.
 - Examples: `examples/blink.rb`, `examples/button.rb`, `examples/servo.rb`.
 - Minitest suite covering chip-selection logic and PWM helpers.
