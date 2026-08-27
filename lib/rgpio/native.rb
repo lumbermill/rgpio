@@ -17,11 +17,18 @@ module Rgpio
   module Native
     extend Fiddle::Importer
 
-    # Try each soname in turn; stop at the first that loads (mirrors the old
-    # `ffi_lib [...]` fallback). dlload raises Fiddle::DLError when a library
-    # is missing.
+    # Try each soname in turn; stop at the first that loads AND exposes the
+    # libgpiod v2 API. dlload raises Fiddle::DLError when a library is missing.
+    #
+    # The soname is not a reliable version signal: Debian Bookworm ships
+    # libgpiod 1.x as `libgpiod.so.2`, while Trixie ships libgpiod 2.x as
+    # `libgpiod.so.3`. So after loading we probe a v2-only symbol
+    # (gpiod_api_version); a v1 library fails the probe and is treated as
+    # unavailable rather than crashing later when its missing functions are
+    # bound. This keeps the sysfs-only HardwarePWM usable on such systems.
     LIBRARY_AVAILABLE = ["libgpiod.so.3", "libgpiod.so.2", "libgpiod.so"].any? do |soname|
       dlload soname
+      Fiddle::Handle.new(soname)["gpiod_api_version"] # raises DLError on v1
       true
     rescue Fiddle::DLError
       false
