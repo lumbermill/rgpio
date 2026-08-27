@@ -61,13 +61,17 @@ offer software PWM for non-PWM pins, and the callback/threading model for
 ## Release / tooling readiness
 
 - [ ] Publish `0.1.0` to RubyGems (currently unpublished; `mfa_required` is set).
+      Gem metadata (`source_code_uri` / `changelog_uri` / `bug_tracker_uri`) and
+      packaged files (incl. CHANGELOG.md) are ready.
 - [x] GitHub Actions CI running the logic-only test suite (no hardware needed) —
       `.github/workflows/ci.yml`, Ruby 3.4, bundler-less (the committed lock is
-      pinned to the aarch64 dev box).
-- [ ] RuboCop (or similar) lint configuration.
+      pinned to the aarch64 dev box). A `RuboCop` lint job runs alongside.
+- [x] RuboCop lint configuration — `.rubocop.yml` tuned to the project's style;
+      the tree is clean. `rake` runs test + rubocop.
 - [ ] Integration tests for `LineRequest` / edge events (needs GPIO loopback
       wiring; not runnable in CI). A manual Pi 5 smoke test already verified
       batch `get_values`/`set_values`.
+- [ ] Optional: RuboCop extensions (`rubocop-minitest`, `rubocop-rake`).
 
 ## Environment caveats (not yet pinned as spec)
 
