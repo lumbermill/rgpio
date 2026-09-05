@@ -23,7 +23,7 @@ Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi,
 - **OS:** Debian Trixie (13) or later — verified target. Bookworm ships libgpiod 1.x, which is not supported.
 - **Hardware:** Raspberry Pi 5 and Pi 4 (verified). Other Pi models: see [PLAN.md](PLAN.md).
 - **Library:** `libgpiod2` (>= 2.1)
-- **Ruby:** >= 3.4 (CRuby)
+- **Ruby:** >= 3.3 (CRuby) — matches Trixie's default `ruby`
 
 Install the runtime library on the Pi:
 

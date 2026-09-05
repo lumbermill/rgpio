@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
   spec.homepage    = "https://github.com/lumbermill/rgpio"
   spec.license     = "MIT"
 
-  spec.required_ruby_version = ">= 3.4"
+  spec.required_ruby_version = ">= 3.3"
 
   spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "LICENSE", "README.md", "CHANGELOG.md"]
 

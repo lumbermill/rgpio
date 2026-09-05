@@ -85,12 +85,9 @@ offer software PWM for non-PWM pins, and the callback/threading model for
       wiring; not runnable in CI). A manual Pi 5 smoke test already verified
       batch `get_values`/`set_values`.
 - [ ] Optional: RuboCop extensions (`rubocop-minitest`, `rubocop-rake`).
-- [ ] **Decide `required_ruby_version`.** The gemspec requires `>= 3.4`, but the
-      stated target (Debian Trixie) ships Ruby **3.3** as its default `ruby`, so
-      `gem install rgpio` would fail on a stock Trixie box. The suite and the full
-      Pi 4 GPIO smoke test both pass on Ruby 3.3.8 and the code uses nothing newer
-      than 3.2 syntax. Recommend lowering the floor to `>= 3.3` to match the
-      target OS (pending maintainer decision).
+- [x] `required_ruby_version` lowered to `>= 3.3` to match Trixie's default
+      `ruby` (so `gem install rgpio` works on a stock Trixie box). Verified on
+      Ruby 3.3.8; CI now tests 3.3 and 3.4.
 
 ## Environment caveats (not yet pinned as spec)
 
