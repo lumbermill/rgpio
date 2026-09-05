@@ -9,7 +9,7 @@ is considered confirmed and supported; anything here is subject to change.
 | Phase | Scope | Status |
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
-| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟡 Pi 4 hardware **PWM** verified; Pi 4/Zero **GPIO (libgpiod)** validation pending |
+| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
 | **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | ⬜ Not started (planned as a separate gem) |
 
 ## Multi-board support — validation status
@@ -20,19 +20,21 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 
 **Validated on real hardware:**
 
-- Hardware PWM on Pi 4 (Model B Rev 1.5): board detection → `:pi4`, chip
-  detection (`fe20c000`, `npwm == 2`), `GPIO18 → channel 0`, and a full
-  export/frequency/duty round-trip. Verified 2026-08-27 (Ruby 3.4.7 via rbenv).
+- Pi 4 GPIO via libgpiod (Model B Rev 1.2, Trixie, libgpiod 2.2.1, Ruby 3.3.8 —
+  `raspi26.local`): header auto-detect → `gpiochip0 [pinctrl-bcm2711]` (58 lines),
+  single + batch `get_value(s)` / `set_value(s)` (bias reads and output
+  round-trip), and the edge-event API. Full suite (47) green on 3.3.8.
+  Verified 2026-09-05.
+- Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
+  detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
+  channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
 
 **Not yet validated on real hardware:**
 
-- Pi 4 / Pi 400 (`pinctrl-bcm2711`) GPIO I/O and edge events via libgpiod. The
-  test Pi 4 runs Debian **Bookworm**, which ships **libgpiod 1.x** (unsupported);
-  `Rgpio.available?` is `false` there. Needs a Pi 4 on Trixie (libgpiod 2.x).
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
   behaviour under load.
 
-Until validated, treat GPIO (libgpiod) on boards other than Pi 5 as best-effort.
+Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
 
 ## Planned API additions (current gem)
 
@@ -83,6 +85,12 @@ offer software PWM for non-PWM pins, and the callback/threading model for
       wiring; not runnable in CI). A manual Pi 5 smoke test already verified
       batch `get_values`/`set_values`.
 - [ ] Optional: RuboCop extensions (`rubocop-minitest`, `rubocop-rake`).
+- [ ] **Decide `required_ruby_version`.** The gemspec requires `>= 3.4`, but the
+      stated target (Debian Trixie) ships Ruby **3.3** as its default `ruby`, so
+      `gem install rgpio` would fail on a stock Trixie box. The suite and the full
+      Pi 4 GPIO smoke test both pass on Ruby 3.3.8 and the code uses nothing newer
+      than 3.2 syntax. Recommend lowering the floor to `>= 3.3` to match the
+      target OS (pending maintainer decision).
 
 ## Environment caveats (not yet pinned as spec)
 
