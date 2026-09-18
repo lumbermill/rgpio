@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # React to a switch with the high-level Rgpio::Button device, which runs the
 # callbacks on a background thread. For the same thing written against

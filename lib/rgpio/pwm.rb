@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # Controls a hardware PWM channel via the Linux PWM sysfs interface
   # (/sys/class/pwm/pwmchipN/pwmM/).
@@ -34,10 +32,10 @@ module Rgpio
   #   pwm.enable
   #   pwm.close   # disables + unexports
   class HardwarePWM
-    PWM_SYSFS_ROOT = "/sys/class/pwm"
+    PWM_SYSFS_ROOT = "/sys/class/pwm".freeze
 
     # Device-tree model string, used to pick the board's PWM mapping.
-    BOARD_MODEL_PATH = "/proc/device-tree/model"
+    BOARD_MODEL_PATH = "/proc/device-tree/model".freeze
 
     # GPIO offset → PWM channel, per board family. The pwmchip *number* is
     # resolved separately at runtime (see {PWM_CHIP_PROFILE}).

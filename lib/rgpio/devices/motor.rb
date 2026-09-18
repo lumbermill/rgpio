@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # A DC motor behind a two-input driver such as the DRV8835 or SN754410:
   # one line drives it forward, the other backward.

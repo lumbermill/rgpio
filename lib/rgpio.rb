@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 require_relative "rgpio/version"
 require_relative "rgpio/native"
 require_relative "rgpio/chip"

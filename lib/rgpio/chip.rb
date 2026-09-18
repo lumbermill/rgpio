@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # Represents an open GPIO chip (e.g. /dev/gpiochip0).
   #
@@ -20,7 +18,7 @@ module Rgpio
   #   chip.close
   class Chip
     # Glob matching every GPIO character device exposed by the kernel.
-    DEVICE_GLOB = "/dev/gpiochip*"
+    DEVICE_GLOB = "/dev/gpiochip*".freeze
 
     # Labels of the GPIO controller wired to the 40-pin header, in detection
     # priority order (newest SoC first). The label comes from the chip's

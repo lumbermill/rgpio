@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # Read a button connected to GPIO27.
 # Prints a line each time the button is pressed or released.

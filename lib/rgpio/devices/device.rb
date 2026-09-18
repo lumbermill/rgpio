@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # Base class for the high-level device API (LED, Button, MotionSensor, Motor).
   #

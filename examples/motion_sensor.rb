@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # Report movement from a PIR sensor with Rgpio::MotionSensor.
 #

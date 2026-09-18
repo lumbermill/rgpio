@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # A single GPIO line read as an input, with optional edge callbacks.
   #

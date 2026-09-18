@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # Drive a standard RC servo motor via hardware PWM on GPIO12.
 #

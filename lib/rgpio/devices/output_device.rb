@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module Rgpio
   # A single GPIO line driven as an output.
   #

@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # Blink an LED with the high-level Rgpio::LED device.
 # For the same thing written against Chip/LineRequest directly, see

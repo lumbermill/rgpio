@@ -1,5 +1,4 @@
 #!/usr/bin/env ruby
-# frozen_string_literal: true
 
 # Drive a DC motor forward and backward with Rgpio::Motor through a DRV8835
 # two-input motor driver.

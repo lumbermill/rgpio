@@ -71,3 +71,8 @@ Naming/PredicateMethod:
 # Development dependencies are declared in the gemspec by choice.
 Gemspec/DevelopmentDependencies:
   Enabled: false
+
+# The gem does not use the frozen-string-literal magic comment: it is noise in
+# every file, and Ruby 3.4+ warns on mutation rather than needing it per-file.
+Style/FrozenStringLiteralComment:
+  Enabled: false
