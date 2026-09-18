@@ -59,9 +59,14 @@ Metrics/BlockLength:
 
 # wait_edge_events mirrors the libgpiod C call: it blocks/waits and reports
 # readiness; it is an action, not a pure predicate, so no `?` suffix.
+#
+# Device#value mirrors gpiozero's `value` attribute, the name the book's readers
+# already know. It is boolean for digital devices but a 0.0–1.0 ratio for the
+# PWM-backed ones, so a `?` suffix would be wrong.
 Naming/PredicateMethod:
   AllowedMethods:
     - wait_edge_events
+    - value
 
 # Development dependencies are declared in the gemspec by choice.
 Gemspec/DevelopmentDependencies:

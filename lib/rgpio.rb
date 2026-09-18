@@ -5,6 +5,10 @@ require_relative "rgpio/native"
 require_relative "rgpio/chip"
 require_relative "rgpio/line_request"
 require_relative "rgpio/pwm"
+require_relative "rgpio/devices/device"
+require_relative "rgpio/devices/output_device"
+require_relative "rgpio/devices/input_device"
+require_relative "rgpio/devices/motor"
 
 # Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
 # the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
@@ -25,6 +29,14 @@ require_relative "rgpio/pwm"
 #     pwm.enable
 #     sleep 2
 #   end
+#
+# Quick start — high-level devices:
+#   led = Rgpio::LED.new(4)
+#   led.on
+#
+#   button = Rgpio::Button.new(17)
+#   button.when_pressed { puts "Pressed" }
+#   Rgpio.pause
 module Rgpio
   # Raised for gem-level errors not covered by stdlib Errno classes.
   class Error < StandardError; end
@@ -54,5 +66,13 @@ module Rgpio
     return nil unless available?
 
     Native.gpiod_api_version
+  end
+
+  # Block the main thread until Ctrl-C, letting device callbacks run.
+  # The Ruby counterpart of Python's signal.pause().
+  def self.pause
+    sleep
+  rescue Interrupt
+    nil
   end
 end

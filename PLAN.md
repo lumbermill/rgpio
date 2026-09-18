@@ -10,7 +10,7 @@ is considered confirmed and supported; anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | ⬜ Not started (planned as a separate gem) |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a (digital I/O) done, untested on hardware; 3b–3e pending |
 
 ## Multi-board support — validation status
 
@@ -58,18 +58,60 @@ is published:
   probes for a v2 symbol and reports `Rgpio.available? == false` instead. Found
   and fixed while validating PWM on the Bookworm Pi 4.
 
-## Phase 3 — high-level API (future, separate gem)
+## Phase 3 — high-level API
 
-A gpiozero-style convenience layer built on top of this gem:
+A gpiozero-style convenience layer on top of the low-level classes. The goal is
+concrete: port every `gpiozero` / `RPi.GPIO` sample in 実践課題3 of
+*Dive into Raspberry Pi 2026* (<https://lmlab.net/books/2601_raspi/>) to Ruby,
+ship each one as an `examples/` script, and verify it on real hardware. The
+examples are named after what they demonstrate rather than after the book's
+Python filenames, so they stand on their own for anyone reading the gem.
 
-- `LED` — on/off/toggle/blink on an output line.
-- `Button` — pressed?/wait_for_press/callbacks over edge events.
-- `PWMLED` — brightness via hardware or software PWM.
-- `Servo` — angle/position over `HardwarePWM`.
+**Settled decisions**
 
-Open questions: gem boundary (separate gem vs. `rgpio/high_level`), whether to
-offer software PWM for non-PWM pins, and the callback/threading model for
-`Button`.
+- **One gem, not two.** The device layer lives in `lib/rgpio/devices/` but keeps
+  the `Rgpio::` namespace, so `require "rgpio"` is all a reader needs. It adds
+  no dependencies, so bundling costs nothing, and splitting later is a directory
+  move. A separate gem would buy independent release cycles — worth little for a
+  single maintainer — at the cost of version-range bookkeeping and a two-gem
+  install for the book's readers.
+- **Hardware PWM over software PWM.** The book drives the servo on GPIO4 and the
+  RGB LED on GPIO2/3/4, none of which are PWM pins, so gpiozero falls back to
+  software PWM — and the book itself notes the resulting servo jitter. The book
+  will be revised to use the hardware PWM pins (GPIO12/13/18/19) instead, which
+  removes the jitter and avoids implementing software PWM at all. Ruby threads
+  would jitter at least as much as gpiozero does.
+- **Callbacks over blocks, dispatched from one watcher thread per device.**
+  `button.when_pressed { ... }` rather than gpiozero's attribute assignment.
+  The thread blocks in `read_edge_events` with a finite timeout so `#close` can
+  stop it; fiddle releases the GVL during the call, so the main thread stays
+  responsive. `Rgpio.pause` stands in for Python's `signal.pause()`.
+
+**Staging**
+
+| Stage | Scope | Book sections | Status |
+|---|---|---|---|
+| 3a | `LED` / `Button` / `MotionSensor` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モーションセンサ, モータードライバ | 🟢 written + unit-tested, **not yet run on hardware** |
+| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ⬜ |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `HardwarePWM` | サーボ, フルカラーLED | ⬜ |
+| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
+| 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
+
+I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
+`/dev/spidevN.M`, so they stay dependency-free like the sysfs PWM code.
+
+**Open questions**
+
+- Does the kernel report edge events in *logical* terms when `active_low` is
+  set (i.e. is rising == "became active")? `InputDevice` assumes yes; needs a
+  hardware check with `active_low: true`.
+- The book's switch is wired to 3.3 V, so `Button` defaults to a pull-**down**
+  bias, unlike gpiozero's pull-up default. Confirm against the book's circuit
+  diagram on hardware before the book is revised.
+- `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
+  sample needs them.
+- `Motor` has no speed control (it would need PWM on both lines); the book's
+  sample only uses full-speed forward/backward.
 
 ## Release / tooling readiness
 

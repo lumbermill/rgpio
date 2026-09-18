@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Drive a standard RC servo motor via hardware PWM on GPIO18.
+# Drive a standard RC servo motor via hardware PWM on GPIO12.
 #
 # Wiring:
 #   GPIO12 (pin 32, RP1 PWM channel 0) -- servo signal wire (usually yellow/orange)

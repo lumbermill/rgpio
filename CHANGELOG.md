@@ -35,6 +35,17 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
 - `examples/pwm_info.rb`: a non-destructive diagnostic that prints the detected
   board, the PWM chips in sysfs, and which chip/channel each header GPIO resolves
   to — without exporting anything.
+- **High-level device API** (`Rgpio::LED`, `Button`, `MotionSensor`, `Motor`,
+  and the `OutputDevice` / `InputDevice` bases they are built on), a
+  gpiozero-style layer over `Chip` / `LineRequest`. Devices open their own chip
+  or share one passed as `chip:`, and `#close` releases only what they own.
+- Edge callbacks on input devices — `button.when_pressed { }`,
+  `sensor.when_motion { }` — dispatched from a background watcher thread that
+  survives a raising callback, plus `Rgpio.pause` as the counterpart to Python's
+  `signal.pause()`.
+- `examples/led.rb`, `button.rb`, `motion_sensor.rb`, `motor.rb`: device-class
+  examples. The `Chip` / `LineRequest` versions of the LED and button demos moved
+  to `examples/lowlevel/`, so the top level shows the API most users want first.
 
 ### Changed
 

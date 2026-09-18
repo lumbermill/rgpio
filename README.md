@@ -266,14 +266,20 @@ Rgpio::HardwarePWM.available_chips
 All examples require root (or `gpio` group membership):
 
 ```sh
-# LED blink on GPIO17
-sudo ruby examples/blink.rb
-
-# Button input on GPIO27
-sudo ruby examples/button.rb
-
-# Servo sweep on GPIO18 (dtoverlay must be configured first)
+# Servo sweep on GPIO12 (dtoverlay must be configured first)
 sudo ruby examples/servo.rb
+
+# Report which PWM chip and channel each header GPIO resolves to
+ruby examples/pwm_info.rb
+```
+
+`examples/lowlevel/` holds the same LED and button demos written directly
+against `Chip` / `LineRequest`, for when you need control the device classes do
+not expose:
+
+```sh
+sudo ruby examples/lowlevel/blink.rb
+sudo ruby examples/lowlevel/button.rb
 ```
 
 ---

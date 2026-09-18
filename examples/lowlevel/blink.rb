@@ -8,11 +8,11 @@
 #   LED cathode          -- GND (pin 9 or any GND pin)
 #
 # Run:
-#   ruby examples/blink.rb
+#   ruby examples/lowlevel/blink.rb
 #
 # Ctrl-C to stop.
 
-require_relative "../lib/rgpio"
+require_relative "../../lib/rgpio"
 
 GPIO_LED    = 17
 BLINK_DELAY = 0.5 # seconds
