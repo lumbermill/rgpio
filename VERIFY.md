@@ -9,7 +9,7 @@ cd ~/sources/rgpio && git pull
 ruby -Ilib -e 'require "rgpio"; p Rgpio.available?, Rgpio.version'
 ```
 
-- [ ] `true` とバージョン文字列が出た（`false` なら `sudo apt install libgpiod3`）
+- [x] `true` とバージョン文字列が出た（`false` なら `sudo apt install libgpiod3`）
 
 ---
 
@@ -21,7 +21,7 @@ ruby -Ilib -e 'require "rgpio"; p Rgpio.available?, Rgpio.version'
 ruby examples/led.rb
 ```
 
-- [ ] 1秒間隔で5回点滅した
+- [x] 1秒間隔で5回点滅した
 
 ---
 
@@ -33,13 +33,18 @@ ruby examples/led.rb
 ruby examples/button.rb
 ```
 
-- [ ] 押すと `Pressed`、離すと `Released`
-- [ ] 1回押して1行だけ（何行も出たらデバウンスが効いていない）
-- [ ] Ctrl+C でエラーを吐かずに止まる
+- [x] 押すと `Pressed`、離すと `Released`
+- [x] 1回押して1行だけ（何行も出たらデバウンスが効いていない）
+- [x] Ctrl+C でエラーを吐かずに止まる
 
 ---
 
-## 3. モーションセンサ
+## 3. モーションセンサ（対象外・保留）
+
+PIRモジュールの調達が安定しないため、Phase 3a の確認対象から外しました。
+`MotionSensor` クラスと `examples/motion_sensor.rb` はそのまま残していますが、
+実機確認が済むまで README には載せません（PLAN.md の Phase 3 を参照）。
+モジュールが手に入ったら以下で再開できます。
 
 配線: `VCC`→5V / `GND`→GND / `OUT`→`GPIO4`
 
@@ -53,14 +58,18 @@ ruby examples/motion_sensor.rb
 
 ## 4. モーター（DRV8835）
 
-配線: `AIN1`→`GPIO2` / `AIN2`→`GPIO14` / `VCC`→3.3V / `VM,GND`→モータ電源
+配線: `AIN1`→`GPIO2` / `AIN2`→`GPIO14` / `VCC`→3.3V / `VM,GND`→モータ電源 /
+`AOUT1`,`AOUT2`→モーターの端子2本
+
+モーターの片方をGNDに落とすと正転しかしません（逆転時は両端がGND電位になるため）。
+必ず `AOUT1`/`AOUT2` の2本で挟んでください。
 
 ```bash
 ruby examples/motor.rb
 ```
 
-- [ ] 5秒ごとに正転・逆転が切り替わる
-- [ ] Ctrl+C でモーターが止まる
+- [x] 5秒ごとに正転・逆転が切り替わる
+- [x] Ctrl+C でモーターが止まる
 
 ---
 
@@ -73,7 +82,7 @@ ruby examples/motor.rb
 ruby -Ilib -e 'require "rgpio"; b = Rgpio::Button.new(4, active_low: true); b.when_pressed { puts "pressed" }; b.when_released { puts "released" }; puts "press the switch (Ctrl-C to stop)"; Rgpio.pause; b.close'
 ```
 
-- [ ] 押したとき `released` と出た → 仮定どおり。何もしなくてOK
+- [x] 押したとき `released` と出た → 仮定どおり。何もしなくてOK
 - [ ] 押したとき `pressed` と出た → カーネルがエッジを反転していない。
       `InputDevice#watch_loop` の rising/inactive の対応を直す必要あり
 
@@ -81,9 +90,11 @@ ruby -Ilib -e 'require "rgpio"; b = Rgpio::Button.new(4, active_low: true); b.wh
 
 ## 全部 ✅ になったら
 
-- [ ] README.md に高レベルAPIの節を追記（確定仕様に昇格）
-- [ ] PLAN.md の 3a を ✅ に、「Open questions」の active_low の項目を削除
-- [ ] コミット
+モーションセンサ（3番）を除いて完了したので、以下を実施済みです。
+
+- [x] README.md に高レベルAPIの節を追記（確定仕様に昇格）
+- [x] PLAN.md の 3a を ✅ に、「Open questions」の active_low の項目を削除
+- [x] コミット
 
 ## つまずいたら
 

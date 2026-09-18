@@ -5,10 +5,11 @@ Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/lib
 Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1).
 
 > **Status:** GPIO + hardware PWM verified on Raspberry Pi 5 and Raspberry Pi 4
-> (Trixie, libgpiod 2.x). Hardware PWM (sysfs) also works on a Bookworm Pi 4,
-> where the libgpiod GPIO path is unavailable (v1). Multi-board support, the
-> roadmap, and planned APIs are tracked in [PLAN.md](PLAN.md); released changes
-> are recorded in [CHANGELOG.md](CHANGELOG.md).
+> (Trixie, libgpiod 2.x). The device API (`LED` / `Button` / `Motor`) is verified
+> on Pi 5. Hardware PWM (sysfs) also works on a Bookworm Pi 4, where the libgpiod
+> GPIO path is unavailable (v1). Multi-board support, the roadmap, and planned
+> APIs are tracked in [PLAN.md](PLAN.md); released changes are recorded in
+> [CHANGELOG.md](CHANGELOG.md).
 
 ## Why libgpiod?
 
@@ -53,7 +54,106 @@ Or install directly:
 gem install rgpio
 ```
 
+## Device API
+
+`LED`, `Button` and `Motor` wrap `Chip` / `LineRequest` in one object per piece
+of hardware, in the style of Python's gpiozero. A device opens its own chip
+unless you hand it one with `chip:`, and `#close` releases only what it owns.
+Devices still under hardware validation are listed in [PLAN.md](PLAN.md).
+
+### LED
+
+```ruby
+require "rgpio"
+
+led = Rgpio::LED.new(4)      # GPIO4 = physical pin 7
+
+5.times do
+  led.on
+  sleep 1
+  led.off
+  sleep 1
+end
+
+led.close                    # releases the line and the chip
+```
+
+`LED` is an `OutputDevice`, which also offers `#toggle`, `#value` / `#value=`
+and `#on?`. Pass `active_low: true` when the LED is wired to sink current
+(`#on` then drives the line low), and `initial_value: true` to have it lit the
+moment the line is claimed.
+
+### Button
+
+```ruby
+require "rgpio"
+
+button = Rgpio::Button.new(4)
+
+button.when_pressed  { puts "Pressed" }
+button.when_released { puts "Released" }
+
+Rgpio.pause                  # block until Ctrl-C while callbacks run
+button.close
+```
+
+Callbacks run on a watcher thread that waits on kernel edge events, one thread
+per device, started by the first callback and stopped by `#close`. A callback
+that raises is reported on `$stderr` without taking the watcher down.
+`Rgpio.pause` is the counterpart of Python's `signal.pause()`.
+
+The default bias is pull-**down**, for a switch wired between the GPIO line and
+3.3 V; pass `pull_up: true` for one wired to GND. Presses are debounced in the
+kernel for 5 ms (`debounce_us:` to change it), so one press fires one callback.
+
+`active_low: true` inverts the logic, and the callbacks follow it: the kernel
+reports edges in logical terms, so `when_pressed` fires when the line goes
+*low*.
+
+### Motor
+
+```ruby
+require "rgpio"
+
+motor = Rgpio::Motor.new(forward: 2, backward: 14)
+
+motor.forward
+sleep 5
+motor.backward
+sleep 5
+motor.stop
+
+motor.close
+```
+
+Written for a two-input driver such as the DRV8835 or SN754410 in IN/IN mode:
+one line drives the motor forward, the other backward, and `Motor` drops one
+before raising the other so the driver is never asked to source and sink the
+same output at once. Wire the motor across the driver's two outputs
+(`AOUT1`/`AOUT2`) — with one terminal on GND only one direction works. Speed
+control would need PWM on both lines and is not implemented.
+
+### Sharing one chip
+
+```ruby
+chip  = Rgpio::Chip.new
+red   = Rgpio::LED.new(17, chip: chip)
+green = Rgpio::LED.new(27, chip: chip)
+
+red.on
+green.off
+
+[red, green].each(&:close)   # the chip stays open — the devices did not open it
+chip.close
+```
+
+---
+
 ## GPIO Usage
+
+The classes the device API is built on. Use them when you need control the
+device classes do not expose — batch I/O across lines, raw edge-event
+timestamps, or a specific `/dev/gpiochipN`.
 
 ### LED blink (output)
 
@@ -266,6 +366,15 @@ Rgpio::HardwarePWM.available_chips
 All examples require root (or `gpio` group membership):
 
 ```sh
+# Blink an LED on GPIO4
+ruby examples/led.rb
+
+# Print Pressed / Released for a switch on GPIO4
+ruby examples/button.rb
+
+# Drive a DC motor forward and backward through a DRV8835
+ruby examples/motor.rb
+
 # Servo sweep on GPIO12 (dtoverlay must be configured first)
 sudo ruby examples/servo.rb
 
@@ -320,6 +429,35 @@ sudo ruby examples/lowlevel/button.rb
 | `#read_edge_events(timeout:, capacity:)` | Array of event hashes |
 | `#release` | Release kernel request |
 
+### `Rgpio::OutputDevice` (and `Rgpio::LED`)
+
+| Method | Description |
+|---|---|
+| `.new(gpio, active_low:, initial_value:, chip:, consumer:)` | Claim a line as an output |
+| `#on` / `#off` / `#toggle` | Drive the line to its active / inactive level |
+| `#value` / `#value=` | Current level as `true` / `false` (`#on?` is an alias of `#value`) |
+| `#gpio` | Line offset this device drives |
+| `#close` / `#closed?` | Release the line (and the chip, if it opened one) |
+
+### `Rgpio::InputDevice` (and `Rgpio::Button`)
+
+| Method | Description |
+|---|---|
+| `.new(gpio, pull_up:, active_low:, debounce_us:, chip:, consumer:)` | Claim a line as an input; `pull_up:` takes `true` / `false` / `nil` (no bias) |
+| `#value` | `true` when the line is at its active level (`#active?`, and `#pressed?` on `Button`) |
+| `#when_pressed { }` / `#when_released { }` | `Button` edge callbacks, run on a watcher thread |
+| `#gpio` | Line offset this device reads |
+| `#close` / `#closed?` | Stop the watcher and release the line |
+
+### `Rgpio::Motor`
+
+| Method | Description |
+|---|---|
+| `.new(forward:, backward:, chip:, consumer:)` | Claim both lines of a two-input driver |
+| `#forward` / `#backward` | Run at full speed in one direction |
+| `#stop` | Drop both lines |
+| `#close` | Stop, then release both lines |
+
 ### `Rgpio::HardwarePWM`
 
 | Method | Description |
@@ -342,6 +480,8 @@ sudo ruby examples/lowlevel/button.rb
 
 ```
 ┌─────────────────────────────────────────┐
+│  Rgpio::LED / Button / Motor            │  device classes (gpiozero-style)
+├─────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────────┤
 │  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
@@ -351,8 +491,9 @@ sudo ruby examples/lowlevel/button.rb
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`)** — Ruby-idiomatic wrappers
+- **Layer 3 (`LED`, `Button`, `Motor`)** — one object per piece of hardware
 
-A high-level, gpiozero-style API (`LED`, `Button`, `PWMLED`, …) is planned; see
+The PWM-backed devices (`PWMLED`, `Servo`, `RGBLED`) are still planned; see
 [PLAN.md](PLAN.md).
 
 ---

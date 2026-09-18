@@ -10,7 +10,7 @@ is considered confirmed and supported; anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a (digital I/O) done, untested on hardware; 3b–3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a verified on Pi 5 (`MotionSensor` deferred); 3b–3e pending |
 
 ## Multi-board support — validation status
 
@@ -25,6 +25,12 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   single + batch `get_value(s)` / `set_value(s)` (bias reads and output
   round-trip), and the edge-event API. Full suite (47) green on 3.3.8.
   Verified 2026-09-05.
+- Pi 5 device API (`LED` / `Button` / `Motor`, Trixie): LED blink on GPIO4,
+  `Button` press/release with the default pull-down bias and 5 ms debounce, and
+  `Motor` forward/backward through a DRV8835 on GPIO2/GPIO14. `active_low: true`
+  on `Button` inverts the callbacks too, settling the edge-polarity question:
+  the kernel does report edges in logical terms, as `InputDevice` assumed.
+  Verified 2026-09-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -33,6 +39,7 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
   behaviour under load.
+- `MotionSensor` — deferred, see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
 
@@ -91,7 +98,8 @@ Python filenames, so they stand on their own for anyone reading the gem.
 
 | Stage | Scope | Book sections | Status |
 |---|---|---|---|
-| 3a | `LED` / `Button` / `MotionSensor` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モーションセンサ, モータードライバ | 🟢 written + unit-tested, **not yet run on hardware** |
+| 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
+| 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ⬜ |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `HardwarePWM` | サーボ, フルカラーLED | ⬜ |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
@@ -102,16 +110,30 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 
 **Open questions**
 
-- Does the kernel report edge events in *logical* terms when `active_low` is
-  set (i.e. is rising == "became active")? `InputDevice` assumes yes; needs a
-  hardware check with `active_low: true`.
 - The book's switch is wired to 3.3 V, so `Button` defaults to a pull-**down**
-  bias, unlike gpiozero's pull-up default. Confirm against the book's circuit
-  diagram on hardware before the book is revised.
+  bias, unlike gpiozero's pull-up default. That wiring is confirmed on hardware;
+  what is left is to cross-check the book's circuit diagram before it is revised.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's
   sample only uses full-speed forward/backward.
+- `MotionSensor` is **deferred**: the PIR modules on hand are an unreliable
+  supply, so it is out of the 3a verification scope and stays out of the README
+  until a module can be tested end to end. The class, its unit tests and
+  `examples/motion_sensor.rb` ship as they are. What testing did show:
+  it reports every pulse the module emits, and the D-SUN (BISS0001)
+  board used for verification false-triggers on 5 V rail noise often enough to
+  be noticeable — 0.9 s pulses arriving with nothing moving. gpiozero smooths
+  this with `queue_len`: a thread polls at `sample_rate` and `is_active`
+  compares the windowed average against `threshold`, so isolated pulses fall
+  below the bar. Porting that directly would replace the kernel edge watcher
+  with a 10 Hz poll, a poor trade for a gem built on the character-device
+  interface; the edge-driven equivalent is to re-read `value` a fixed delay
+  after a rising edge and dispatch only if the line is still active.
+  `debounce_us` cannot stand in for either: a spurious pulse is stable for its
+  whole length, so any debounce long enough to drop it also drops real
+  detections. Not implemented — decoupling the sensor (100 µF + 0.1 µF across
+  VCC/GND) is the first fix, and no book sample needs the filtering.
 
 ## Release / tooling readiness
 
