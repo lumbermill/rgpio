@@ -10,7 +10,7 @@ is considered confirmed and supported; anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a verified on Pi 5 (`MotionSensor` deferred); 3b–3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a verified on Pi 5 (`MotionSensor` deferred); 3b written, sensor/LCD await hardware; 3c–3e pending |
 
 ## Multi-board support — validation status
 
@@ -31,6 +31,13 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   on `Button` inverts the callbacks too, settling the edge-polarity question:
   the kernel does report edges in logical terms, as `InputDevice` assumed.
   Verified 2026-09-18.
+- Pi 5 I2C bus layer (`Rgpio::I2C`, Trixie): read the 128-byte EDID of the
+  HDMI DDC EEPROM (`/dev/i2c-13`, address 0x50) with a valid checksum, both as
+  separate write + read and as a `write_read` repeated-START transfer, with the
+  two agreeing byte for byte. A bus with nothing at the address reports
+  `Errno::EREMOTEIO` rather than hanging. This exercises the `i2c_msg` /
+  `i2c_rdwr_ioctl_data` packing, which is where a mistake would corrupt
+  transfers silently. Verified 2026-09-23.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -38,7 +45,11 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 **Not yet validated on real hardware:**
 
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
-  behaviour under load.
+  behaviour under load. The `i2c_msg` struct layout is 32-bit-aware (the buffer
+  pointer sits at offset 8 either way) but has only been exercised on aarch64.
+- `Rgpio::ADT7410` and `Rgpio::ST7032` — written and unit-tested against the
+  datasheets, but no module has been on the bus yet. The header bus itself
+  (`dtparam=i2c_arm=on`, `/dev/i2c-1`) is still disabled on the dev Pi 5.
 - `MotionSensor` — deferred, see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
@@ -100,13 +111,36 @@ Python filenames, so they stand on their own for anyone reading the gem.
 |---|---|---|---|
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
-| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ⬜ |
+| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | 🟢 `I2C` verified on Pi 5; the two drivers await their modules |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `HardwarePWM` | サーボ, フルカラーLED | ⬜ |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
 I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 `/dev/spidevN.M`, so they stay dependency-free like the sysfs PWM code.
+
+**Phase 3b notes**
+
+- `Rgpio::I2C` is one object per address: `I2C.new(address:, bus: 1)` claims the
+  address with the `I2C_SLAVE` ioctl and keeps the file open. Two devices on one
+  bus (the sensor at 0x48 and the display at 0x3e) are therefore two `I2C`
+  objects, not a shared one — that is what the kernel interface models, and it
+  keeps `write`/`read` free of an address argument.
+- `write_read` issues a repeated START through `I2C_RDWR` rather than a write
+  followed by a separate read. Both work for the ADT7410, but only the former is
+  safe if another master shares the bus.
+- No SMBus (`I2C_SMBUS`) layer: the ioctl only reaches adapters that implement
+  the SMBus subset, and plain I2C transfers cover every device in the book.
+- No bus scan (`i2cdetect`-style) yet. A scan has to guess between a quick-write
+  and a read probe per address, and probing write-only devices can change their
+  state; `i2cdetect -y 1` already does it safely from the shell.
+- `ST7032#print` drops text that would run past the last column instead of
+  wrapping, because the controller's DDRAM addresses are not contiguous between
+  rows — an overrun scatters characters into invisible addresses rather than
+  continuing on the next line.
+- Contrast is the one setting that cannot be read back, and a wrong value looks
+  exactly like a dead panel. 0x20 with the booster on is the 3.3 V default; the
+  5 V panels want roughly 0x28 with the booster off.
 
 **Open questions**
 
