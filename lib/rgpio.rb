@@ -3,10 +3,13 @@ require_relative "rgpio/native"
 require_relative "rgpio/chip"
 require_relative "rgpio/line_request"
 require_relative "rgpio/pwm"
+require_relative "rgpio/i2c"
 require_relative "rgpio/devices/device"
 require_relative "rgpio/devices/output_device"
 require_relative "rgpio/devices/input_device"
 require_relative "rgpio/devices/motor"
+require_relative "rgpio/devices/adt7410"
+require_relative "rgpio/devices/st7032"
 
 # Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
 # the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
@@ -35,6 +38,12 @@ require_relative "rgpio/devices/motor"
 #   button = Rgpio::Button.new(17)
 #   button.when_pressed { puts "Pressed" }
 #   Rgpio.pause
+#
+# Quick start — I2C devices:
+#   puts Rgpio::ADT7410.new.temperature
+#
+#   lcd = Rgpio::ST7032.new
+#   lcd.message = "Hello\nrgpio"
 module Rgpio
   # Raised for gem-level errors not covered by stdlib Errno classes.
   class Error < StandardError; end
@@ -44,6 +53,9 @@ module Rgpio
 
   # Raised for PWM-related errors.
   class PWMError < Error; end
+
+  # Raised for I2C-related errors not reported as an Errno by the kernel.
+  class I2CError < Error; end
 
   # @return [Boolean] whether the libgpiod shared library is loaded
   def self.available?

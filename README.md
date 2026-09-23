@@ -361,6 +361,67 @@ Rgpio::HardwarePWM.available_chips
 
 ---
 
+## I2C Usage
+
+`Rgpio::I2C` talks to a device on a Linux i2c-dev bus (`/dev/i2c-N`). It is
+plain `ioctl` work on a character device, so it needs no libgpiod — it works
+even where `Rgpio.available?` is `false`.
+
+### Step 1 — Enable the header bus
+
+The 40-pin header bus (GPIO2 = SDA, GPIO3 = SCL) is bus 1, and is off by
+default:
+
+```sh
+sudo raspi-config nonint do_i2c 0   # or add dtparam=i2c_arm=on to /boot/firmware/config.txt
+sudo reboot
+```
+
+### Step 2 — Verify
+
+```sh
+ls /dev/i2c-1
+i2cdetect -y 1      # lists the addresses that answer (i2c-tools package)
+```
+
+```ruby
+Rgpio::I2C.buses    # => [1, 13, 14]
+```
+
+### Step 3 — Talk to a device
+
+```ruby
+require "rgpio"
+
+# Block form closes the bus device on exit.
+Rgpio::I2C.open(address: 0x48) do |i2c|
+  # Write, then read back without releasing the bus (repeated START) — this is
+  # what a device with a register pointer expects.
+  msb, lsb = i2c.read_register(0x00, 2)
+
+  # Or drive the two halves separately.
+  i2c.write(0x03, 0x80)      # write 0x80 to register 0x03
+  bytes = i2c.read(2)        # => [Integer, Integer]
+end
+```
+
+Reads return byte arrays. Writes take integers, strings, or a mix, so a control
+byte and a payload can go out in one transaction:
+
+```ruby
+i2c.write(0x40, "Hello")     # => 6
+```
+
+Failures surface as the kernel's own `Errno` exceptions: `Errno::EREMOTEIO`
+when nothing acknowledges the address, `Errno::EBUSY` when a kernel driver
+already holds it (pass `force: true` to claim it anyway), `Errno::EACCES` when
+the user is not in the `i2c` group.
+
+Drivers for specific chips (`Rgpio::ADT7410`, `Rgpio::ST7032`) ship with the gem
+but are not confirmed spec yet — see [PLAN.md](PLAN.md).
+
+---
+
 ## Running the examples
 
 All examples require root (or `gpio` group membership):
@@ -458,6 +519,21 @@ sudo ruby examples/lowlevel/button.rb
 | `#stop` | Drop both lines |
 | `#close` | Stop, then release both lines |
 
+### `Rgpio::I2C`
+
+| Method | Description |
+|---|---|
+| `.new(address:, bus: 1, force: false)` | Open `/dev/i2c-N` and claim a 7-bit address |
+| `.open(address:, bus:) { \|i2c\| }` | Block form; closes on exit |
+| `.buses` | Bus numbers with a `/dev/i2c-N` node |
+| `#write(*bytes)` | Write integers / strings in one transaction |
+| `#read(count)` | Read `count` bytes → `Array<Integer>` |
+| `#write_read(bytes, count)` | Write then read with a repeated START |
+| `#read_register(register, count = 1)` | `write_read([register], count)` |
+| `#write_register(register, *bytes)` | Write a register in one transaction |
+| `#address` / `#bus` / `#path` | What this device was opened on |
+| `#close` / `#closed?` | Close the bus device |
+
 ### `Rgpio::HardwarePWM`
 
 | Method | Description |
@@ -479,18 +555,18 @@ sudo ruby examples/lowlevel/button.rb
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│  Rgpio::LED / Button / Motor            │  device classes (gpiozero-style)
-├─────────────────────────────────────────┤
-│  Rgpio::Chip / LineRequest              │  OOP wrappers (this gem)
-├──────────────────┬──────────────────────┤
-│  Native (fiddle) │  HardwarePWM         │  libgpiod.so  /  sysfs PWM
-└──────────────────┴──────────────────────┘
-       libgpiod v2 ABI          Linux PWM sysfs
+┌─────────────────────────────────────────────────────────┐
+│  Rgpio::LED / Button / Motor                            │  device classes (gpiozero-style)
+├─────────────────────────────────────────────────────────┤
+│  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
+├──────────────────┬──────────────────┬───────────────────┤
+│  Native (fiddle) │  HardwarePWM     │  I2C              │  libgpiod.so / sysfs PWM / i2c-dev
+└──────────────────┴──────────────────┴───────────────────┘
+     libgpiod v2 ABI    Linux PWM sysfs    /dev/i2c-N ioctl
 ```
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
-- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`)** — Ruby-idiomatic wrappers
+- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `I2C`)** — Ruby-idiomatic wrappers
 - **Layer 3 (`LED`, `Button`, `Motor`)** — one object per piece of hardware
 
 The PWM-backed devices (`PWMLED`, `Servo`, `RGBLED`) are still planned; see

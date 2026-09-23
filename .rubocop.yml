@@ -68,6 +68,11 @@ Naming/PredicateMethod:
     - wait_edge_events
     - value
 
+# Hardware code formats register values as hex: `format("0x%02x", address)` is
+# the clearest way to write that, and naming every placeholder adds noise.
+Style/FormatStringToken:
+  EnforcedStyle: unannotated
+
 # Development dependencies are declared in the gemspec by choice.
 Gemspec/DevelopmentDependencies:
   Enabled: false
