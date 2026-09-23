@@ -115,27 +115,21 @@ ruby -Ilib -e 'require "rgpio"; b = Rgpio::Button.new(4, active_low: true); b.wh
 | 3番 | GPIO2 / SDA | SDA（センサ・LCD 両方） |
 | 5番 | GPIO3 / SCL | SCL（センサ・LCD 両方） |
 
-## 0. ヘッダのI2Cバスを有効化（未実施）
+## 0. ヘッダのI2Cバスを有効化（済）
 
-Pi 5 の開発機ではまだ無効です（`/dev/i2c-1` が無い）。実行時 `dtparam` では
-有効にならなかったので、config.txt を書き換えて再起動が必要です。
-
-```bash
-sudo raspi-config nonint do_i2c 0    # /boot/firmware/config.txt の dtparam=i2c_arm=on を有効化
-sudo reboot
-```
-
-再起動後:
+Raspberry Pi の Control Centre（設定アプリ）のインターフェイス設定で I2C を
+有効化済みです。再起動は不要で、その場で `/dev/i2c-1` が生えました。
 
 ```bash
 ls /dev/i2c-1
+pinctrl get 2,3          # GPIO2 = SDA1 / GPIO3 = SCL1 (a3) になっていること
 i2cdetect -y 1
 ruby -Ilib -e 'require "rgpio"; p Rgpio::I2C.buses'
 ```
 
-- [ ] `/dev/i2c-1` がある
-- [ ] `i2cdetect -y 1` に `48`（センサ）と `3e`（LCD）が出る
-- [ ] `Rgpio::I2C.buses` に `1` が含まれる
+- [x] `/dev/i2c-1` がある（2026-09-23、Control Centre で有効化）
+- [x] `Rgpio::I2C.buses` に `1` が含まれる（`[1, 13, 14]`）
+- [ ] `i2cdetect -y 1` に `48`（センサ）と `3e`（LCD）が出る ← 配線するとここが埋まる
 
 ## 1. バス層そのもの（配線不要・確認済み）
 
