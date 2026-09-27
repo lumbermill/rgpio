@@ -10,7 +10,7 @@ is considered confirmed and supported; anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a verified on Pi 5 (`MotionSensor` deferred); 3b written, sensor/LCD await hardware; 3c–3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a + 3b verified on Pi 5 (`MotionSensor` deferred); 3c–3e pending |
 
 ## Multi-board support — validation status
 
@@ -38,6 +38,13 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   `Errno::EREMOTEIO` rather than hanging. This exercises the `i2c_msg` /
   `i2c_rdwr_ioctl_data` packing, which is where a mistake would corrupt
   transfers silently. Verified 2026-09-23.
+- Pi 5 I2C devices (`ADT7410` + `ST7032`, Trixie, header bus `/dev/i2c-1`): both
+  modules on one bus (0x48 and 0x3e, one `I2C` object each) with no contention.
+  ADT7410: ID register 0xcb, room temperature in 0.0625 degC steps in 13-bit
+  mode, 0.0078 degC steps in 16-bit mode, and switching resolution at runtime.
+  ST7032 on an AQM0802 (8x2): both rows legible at the 3.3 V defaults
+  (`contrast: 0x20`, booster on) with no adjustment needed, `move_to` addressing
+  each row, and in-place overwrite. Verified 2026-09-27.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -47,9 +54,10 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
   behaviour under load. The `i2c_msg` struct layout is 32-bit-aware (the buffer
   pointer sits at offset 8 either way) but has only been exercised on aarch64.
-- `Rgpio::ADT7410` and `Rgpio::ST7032` — written and unit-tested against the
-  datasheets, but no module has been on the bus yet. The header bus itself
-  (`dtparam=i2c_arm=on`, `/dev/i2c-1`) is still disabled on the dev Pi 5.
+- `Rgpio::ST7032` on a 16-column AQM1602, and on a 5 V module (`booster: false`);
+  only the 8x2 AQM0802 at 3.3 V has been on the bus.
+- `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
+  unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
@@ -111,7 +119,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 |---|---|---|---|
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
-| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | 🟢 `I2C` verified on Pi 5; the two drivers await their modules |
+| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `HardwarePWM` | サーボ, フルカラーLED | ⬜ |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
@@ -134,6 +142,10 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - No bus scan (`i2cdetect`-style) yet. A scan has to guess between a quick-write
   and a read probe per address, and probing write-only devices can change their
   state; `i2cdetect -y 1` already does it safely from the shell.
+- Redrawing with `clear` once a second visibly flickers on these panels, because
+  the clear blanks the row for as long as the next transfer takes. The examples
+  write the label once and then overwrite the value in place, padded to the row
+  width. Found while verifying on the AQM0802.
 - `ST7032#print` drops text that would run past the last column instead of
   wrapping, because the controller's DDRAM addresses are not contiguous between
   rows — an overrun scatters characters into invisible addresses rather than

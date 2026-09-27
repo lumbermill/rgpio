@@ -24,16 +24,27 @@ require_relative "../lib/rgpio"
 COLUMNS = 8 # 16 for an AQM1602
 INTERVAL = 1.0
 
+$stdout.sync = true # so the readings still appear when piped to a file
+
 sensor = Rgpio::ADT7410.new
 lcd = Rgpio::ST7032.new(columns: COLUMNS)
 
 sleep Rgpio::ADT7410::CONVERSION_TIME
 
+# The label never changes, so write it once.
+lcd.move_to(0, 0)
+lcd.print("Temp".ljust(COLUMNS))
+
 begin
   loop do
     celsius = sensor.temperature
-    lcd.clear
-    lcd.print(format("Temp\n%5.1f C", celsius))
+
+    # Overwrite the value in place rather than clearing: a clear blanks the
+    # panel for the width of the next transfer, which reads as a flicker once
+    # a second. Padding to the full row erases the previous, longer value.
+    lcd.move_to(0, 1)
+    lcd.print(format("%.1f C", celsius).rjust(COLUMNS))
+
     puts format("%.2f degC", celsius)
     sleep INTERVAL
   end

@@ -46,12 +46,13 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
 - **I2C support via the Linux i2c-dev interface** (`Rgpio::I2C`): `write`,
   `read`, `write_read` (repeated START), `read_register` / `write_register`,
   block-form `.open`, and `.buses`. Built on `ioctl` against `/dev/i2c-N`, so it
-  needs no libgpiod and works wherever `Rgpio.available?` is false.
+  needs no libgpiod and works wherever `Rgpio.available?` is false. Verified on
+  Pi 5 against an EEPROM (128-byte EDID read, valid checksum).
 - **I2C device drivers**: `Rgpio::ADT7410` (temperature sensor — 13/16-bit
   resolution, `#temperature`, `#detected?`) and `Rgpio::ST7032` (AQM0802 /
   AQM1602 character LCD — `#message=`, `#print`, `#move_to`, `#contrast=`,
   `#display_on` / `#display_off`). Both take an `i2c:` to share a bus device, or
-  open their own.
+  open their own. Verified on Pi 5 with both modules on the header bus at once.
 - `examples/temperature.rb`, `lcd.rb`, `lcd_thermometer.rb`: I2C examples.
 - `examples/led.rb`, `button.rb`, `motion_sensor.rb`, `motor.rb`: device-class
   examples. The `Chip` / `LineRequest` versions of the LED and button demos moved

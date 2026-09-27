@@ -129,7 +129,7 @@ ruby -Ilib -e 'require "rgpio"; p Rgpio::I2C.buses'
 
 - [x] `/dev/i2c-1` がある（2026-09-23、Control Centre で有効化）
 - [x] `Rgpio::I2C.buses` に `1` が含まれる（`[1, 13, 14]`）
-- [ ] `i2cdetect -y 1` に `48`（センサ）と `3e`（LCD）が出る ← 配線するとここが埋まる
+- [x] `i2cdetect -y 1` に `48`（センサ）と `3e`（LCD）が出た（2026-09-27）
 
 ## 1. バス層そのもの（配線不要・確認済み）
 
@@ -154,10 +154,10 @@ i2c.close'
 ruby examples/temperature.rb
 ```
 
-- [ ] `ADT7410 at 0x48, ID 0xcb, 13-bit mode` が出る
-- [ ] 1秒ごとに室温らしい値が出る
-- [ ] センサを指でつまむと値が上がる（0.0625℃刻みで動く）
-- [ ] Ctrl+C でエラーを吐かずに止まる
+- [x] `ADT7410 at 0x48, ID 0xcb, 13-bit mode` が出た
+- [x] 1秒ごとに室温らしい値（26〜27℃）が出た
+- [x] 0.0625℃刻みで動いた
+- [x] Ctrl+C でエラーを吐かずに止まった
 
 16bitモードも確認する場合:
 
@@ -165,7 +165,7 @@ ruby examples/temperature.rb
 ruby -Ilib -e 'require "rgpio"; s = Rgpio::ADT7410.new(resolution: 16); sleep 0.3; p s.resolution, s.temperature; s.close'
 ```
 
-- [ ] `16` と、13bit時と同じくらいの値（刻みが 0.0078℃ になる）
+- [x] `16` と同じ温度、刻みが 0.0078℃ になった（13bit への戻しも確認）
 
 ## 3. LCD AQM0802（ST7032）
 
@@ -175,11 +175,10 @@ AQM1602（16桁）の場合は `examples/lcd.rb` の `COLUMNS = 8` を `16` に�
 ruby examples/lcd.rb
 ```
 
-- [ ] 1行目 `Hello` / 2行目 `rgpio` が出る
-- [ ] そのあと `count` と 1→2→3 のカウントが2行目に出る
-- [ ] 最後に `bye` が出て消える
-- [ ] 表示が薄い・出ない → コントラスト。`Rgpio::ST7032.new(contrast: 0x28)` など
-      0x10〜0x38 で振ってみる（5V版モジュールなら `booster: false` も試す）
+- [x] 2行とも既定のコントラスト（0x20）ではっきり表示された — AQM0802（8桁×2行）
+- [x] `move_to` で行ごとに書き換えできた
+- [ ] 薄い・出ないときは `Rgpio::ST7032.new(contrast: 0x28)` など 0x10〜0x38 で
+      振る（5V版モジュールなら `booster: false` も試す）— 今回は調整不要だった
 
 ## 4. センサとLCDの同居
 
@@ -187,15 +186,21 @@ ruby examples/lcd.rb
 ruby examples/lcd_thermometer.rb
 ```
 
-- [ ] LCDに `Temp` と温度が1秒ごとに更新される
-- [ ] 端末にも同じ値が出る（2つの `I2C` オブジェクトが同じバスで喧嘩しない）
-- [ ] Ctrl+C でLCDがクリアされて止まる
+- [x] LCDに `Temp` と温度が1秒ごとに更新された
+- [x] 端末にも同じ値が出た（2つの `I2C` オブジェクトが同じバスで喧嘩しない）
+- [x] Ctrl+C でLCDがクリアされて止まった
+- [x] 毎秒 `clear` するとちらつくので、ラベルは1回だけ書いて値を上書きする形に修正
 
 ## 全部 ✅ になったら
 
-- [ ] README.md に `Rgpio::ADT7410` / `Rgpio::ST7032` を追記（確定仕様に昇格）
-- [ ] PLAN.md の 3b を ✅ に、「Not yet validated」から2クラスを削除
-- [ ] CHANGELOG を確認してコミット
+2026-09-27 に完了したので、以下を実施済みです。
+
+- [x] README.md に `Rgpio::ADT7410` / `Rgpio::ST7032` を追記（確定仕様に昇格）
+- [x] PLAN.md の 3b を ✅ に、「Not yet validated」から2クラスを削除
+- [x] CHANGELOG を確認してコミット
+
+残っている未確認: AQM1602（16桁）、5V版モジュール（`booster: false`）、
+0℃以下の温度（変換の負値側）。
 
 ## つまずいたら
 

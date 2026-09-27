@@ -417,8 +417,51 @@ when nothing acknowledges the address, `Errno::EBUSY` when a kernel driver
 already holds it (pass `force: true` to claim it anyway), `Errno::EACCES` when
 the user is not in the `i2c` group.
 
-Drivers for specific chips (`Rgpio::ADT7410`, `Rgpio::ST7032`) ship with the gem
-but are not confirmed spec yet — see [PLAN.md](PLAN.md).
+### Temperature sensor — `Rgpio::ADT7410`
+
+```ruby
+sensor = Rgpio::ADT7410.new        # address 0x48 on bus 1
+puts sensor.temperature            # => 27.25  (degrees Celsius)
+sensor.close
+```
+
+The address is set by the A1/A0 pins: 0x48 with both low (the default on the
+breakout boards) through 0x4b. The sensor powers up in 13-bit mode, resolving
+0.0625 degC; `resolution: 16` resolves 0.0078 degC.
+
+```ruby
+sensor = Rgpio::ADT7410.new(address: 0x49, resolution: 16)
+sensor.detected?                   # => true when the ID register reports Analog Devices
+sensor.resolution = 13             # switch back at runtime
+```
+
+The first conversion after power-up takes 240 ms
+(`Rgpio::ADT7410::CONVERSION_TIME`); read before it finishes and the register
+still holds its 0 degC reset value.
+
+### Character LCD — `Rgpio::ST7032`
+
+For the ST7032-based modules — Akizuki AQM0802 (8x2) and AQM1602 (16x2) — which
+answer at 0x3e.
+
+```ruby
+lcd = Rgpio::ST7032.new(columns: 8)   # 3.3 V defaults: contrast 0x20, booster on
+lcd.message = "Hello\nrgpio"          # clear, then print; a newline is the next row
+
+lcd.move_to(0, 1)                     # column, row
+lcd.print("27.2 C".rjust(8))          # overwrite in place — clearing every update flickers
+lcd.contrast = 0x28                   # 0..63
+lcd.close                             # the panel keeps whatever was written last
+```
+
+Text that would run past the last column of a row is dropped rather than
+wrapped: the controller's DDRAM addresses are not contiguous between rows, so an
+overrun scatters characters into invisible addresses instead of continuing on the
+next line.
+
+A panel showing nothing is almost always contrast, which is the one setting the
+controller cannot read back — sweep `contrast:` across 0x10..0x38. Modules run at
+5 V want the boost converter off (`booster: false`).
 
 ---
 
@@ -441,6 +484,15 @@ sudo ruby examples/servo.rb
 
 # Report which PWM chip and channel each header GPIO resolves to
 ruby examples/pwm_info.rb
+
+# Print the ADT7410 temperature once a second
+ruby examples/temperature.rb
+
+# Write text and a counter to an ST7032 LCD
+ruby examples/lcd.rb
+
+# Show the temperature on the LCD — both I2C devices on one bus
+ruby examples/lcd_thermometer.rb
 ```
 
 `examples/lowlevel/` holds the same LED and button demos written directly
@@ -534,6 +586,36 @@ sudo ruby examples/lowlevel/button.rb
 | `#address` / `#bus` / `#path` | What this device was opened on |
 | `#close` / `#closed?` | Close the bus device |
 
+### `Rgpio::ADT7410`
+
+| Method | Description |
+|---|---|
+| `.new(address: 0x48, bus: 1, resolution: 13, i2c: nil)` | Open the sensor; `i2c:` shares an existing bus device |
+| `.convert(msb, lsb, resolution = 13)` | Raw register pair → degrees Celsius |
+| `#temperature` | Temperature in degrees Celsius (`#value` is an alias) |
+| `#raw_temperature` | The two temperature bytes, MSB first |
+| `#resolution` / `#resolution=` | 13 or 16 bits |
+| `#id` / `#detected?` | ID register, and whether it reports Analog Devices |
+| `#i2c` | The bus device readings go through |
+| `#close` / `#closed?` | Close the bus device, if this sensor opened it |
+
+### `Rgpio::ST7032`
+
+| Method | Description |
+|---|---|
+| `.new(address: 0x3e, bus: 1, columns: 8, rows: 2, contrast: 0x20, booster: true, i2c: nil)` | Open and initialise the display |
+| `.open(...) { \|lcd\| }` | Block form; closes on exit |
+| `#message=(text)` | Clear, then print |
+| `#print(text)` | Write at the cursor; a newline moves to the next row |
+| `#move_to(col, row = 0)` | Move the cursor (`#set_cursor` is an alias) |
+| `#clear` / `#home` | Blank the display / return the cursor |
+| `#contrast` / `#contrast=` | 0..63 |
+| `#display_on` / `#display_off` | Blank the panel without losing its contents |
+| `#command(byte)` / `#write_data(text)` | Raw instruction / display-data transfer |
+| `#reset` | Re-run the power-on initialisation sequence |
+| `#columns` / `#rows` / `#i2c` | Geometry, and the bus device writes go through |
+| `#close` / `#closed?` | Close the bus device, if this display opened it |
+
 ### `Rgpio::HardwarePWM`
 
 | Method | Description |
@@ -556,7 +638,7 @@ sudo ruby examples/lowlevel/button.rb
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Rgpio::LED / Button / Motor                            │  device classes (gpiozero-style)
+│  LED / Button / Motor / ADT7410 / ST7032                │  device classes (gpiozero-style)
 ├─────────────────────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────┬───────────────────┤
@@ -567,7 +649,8 @@ sudo ruby examples/lowlevel/button.rb
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `I2C`)** — Ruby-idiomatic wrappers
-- **Layer 3 (`LED`, `Button`, `Motor`)** — one object per piece of hardware
+- **Layer 3 (`LED`, `Button`, `Motor`, `ADT7410`, `ST7032`)** — one object per
+  piece of hardware
 
 The PWM-backed devices (`PWMLED`, `Servo`, `RGBLED`) are still planned; see
 [PLAN.md](PLAN.md).

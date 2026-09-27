@@ -24,6 +24,8 @@ require_relative "../lib/rgpio"
 ADDRESS = 0x48
 INTERVAL = 1.0
 
+$stdout.sync = true # so the readings still appear when piped to a file
+
 puts "I2C buses: #{Rgpio::I2C.buses.inspect}"
 
 sensor = Rgpio::ADT7410.new(address: ADDRESS)
