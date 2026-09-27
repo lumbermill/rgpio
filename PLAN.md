@@ -45,6 +45,25 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   ST7032 on an AQM0802 (8x2): both rows legible at the 3.3 V defaults
   (`contrast: 0x20`, booster on) with no adjustment needed, `move_to` addressing
   each row, and in-place overwrite. Verified 2026-09-27.
+- Pi 5 software PWM accuracy (`Rgpio::SoftwarePWM`, Trixie): measured with a
+  jumper from GPIO23 to GPIO24 and the kernel's own edge timestamps
+  (`examples/pwm_jitter.rb`; the generator runs in a forked process so it does
+  not share a GVL with the measuring loop). At 50 Hz / 1500 us — a servo's centre
+  position — the pulse came out at 1504.9 us mean, **6.2 us standard deviation**,
+  4.7 us median error, 27 us p99, over three runs that agreed to within 0.5 us of
+  mean. At 100 Hz / duty 0.5 the pulse held 5007.7 us with 4.9 us sd. No dropped
+  cycles in any run. CPU cost of the generating thread: 2.7% of one core at
+  50 Hz, 5.3% at 100 Hz, 4.3% at 1 kHz (the spin cap keeps the high frequency
+  cheap). Verified 2026-09-27.
+- Pi 5 gpiozero comparison, same wiring and same measurement: gpiozero's
+  `PWMOutputDevice` at 50 Hz / duty 0.075 produced a **1424 us** pulse (82 us
+  median error) and quantises duty to whole percent — 0.070, 0.075 and 0.079 all
+  came out at ~1410-1424 us and 0.080 jumped to 1621 us, i.e. **200 us steps** on
+  a 20 ms frame. Its cause is in gpiozero, not lgpio: the lgpio pin driver passes
+  `int(value * 100)`. A 180-degree servo therefore has about ten reachable
+  positions under Python on a Pi 5, against continuous positioning here. At
+  100 Hz / duty 0.5 (where 50% is exactly representable) the two are equivalent
+  (2.5 us vs 2.9 us median error). Verified 2026-09-27.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -101,12 +120,18 @@ Python filenames, so they stand on their own for anyone reading the gem.
   move. A separate gem would buy independent release cycles — worth little for a
   single maintainer — at the cost of version-range bookkeeping and a two-gem
   install for the book's readers.
-- **Hardware PWM over software PWM.** The book drives the servo on GPIO4 and the
-  RGB LED on GPIO2/3/4, none of which are PWM pins, so gpiozero falls back to
-  software PWM — and the book itself notes the resulting servo jitter. The book
-  will be revised to use the hardware PWM pins (GPIO12/13/18/19) instead, which
-  removes the jitter and avoids implementing software PWM at all. Ruby threads
-  would jitter at least as much as gpiozero does.
+- **Software PWM by default, hardware PWM opt-in** (revised 2026-09-27; this
+  reverses the earlier "hardware PWM only" decision). The constraint that
+  settled it: *the book's readers must not have to edit config.txt*, and hardware
+  PWM cannot be reached without a dtoverlay — on a Pi 5 the stock overlays route
+  at most **two** header pins (`pwm-2chan`: `pin` from 12/18, `pin2` from 13/19),
+  so an `RGBLED` could not work at all. `Rgpio::SoftwarePWM` needs no
+  configuration, drives any line, and — measured, see below — beats gpiozero on
+  its own ground, so the book keeps its GPIO2/3/4 wiring and no revision is
+  needed. `pwm: :hardware` stays available for anyone who can set the overlay.
+  What gpiozero does, for the record: everything goes through `lgpio.tx_pwm`,
+  which its own docs call "software timed PWM" — it never touches the kernel PWM
+  interface, which is why it needs no config.txt either.
 - **Callbacks over blocks, dispatched from one watcher thread per device.**
   `button.when_pressed { ... }` rather than gpiozero's attribute assignment.
   The thread blocks in `read_edge_events` with a finite timeout so `#close` can
@@ -120,7 +145,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3c | `Servo` / `PWMLED` / `RGBLED` over `HardwarePWM` | サーボ, フルカラーLED | ⬜ |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | 🟡 `SoftwarePWM` done + measured on Pi 5; device classes next |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
@@ -153,6 +178,34 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - Contrast is the one setting that cannot be read back, and a wrong value looks
   exactly like a dead panel. 0x20 with the booster on is the 3.3 V default; the
   5 V panels want roughly 0x28 with the booster off.
+
+**Phase 3c notes**
+
+- `SoftwarePWM` sleeps until shortly before each edge and then spins. The spin is
+  what makes it usable: with `spin_us: 0`, a 50 Hz 1500 us pulse spread over
+  72..6756 us (386 us sd) — a servo would visibly slam around. 300 us of spin
+  brought that to 6 us sd; 1000 us was no better. The spin is capped at 5% of the
+  period per edge so a high frequency cannot turn the thread into a busy loop.
+- Two accuracy bugs, both found by measuring and both worth remembering:
+  re-reading the frequency/duty under the mutex *between* the deadline and the
+  rising edge charged that work to the pulse, and timing the high phase from the
+  nominal deadline charged it the wake-up overshoot too (15 us of every pulse).
+  The high phase is now timed from a clock read taken just before the rising
+  edge's `set_value`, and a **write of the level the line already holds** goes
+  out before that read: the first call after waking from the long low phase is
+  slow and erratic, and paying it in advance leaves the real edge on a warm path.
+  That one line took the spread from 20 us to 6 us.
+- Remaining bias is +5 us (pulse slightly long), stable run to run. On a
+  180-degree servo that is 0.4 degrees, and a constant offset is what the
+  per-servo `min_pulse_us` / `max_pulse_us` calibration absorbs anyway.
+- Spread depends on what else the machine is doing: the same configuration
+  measured 6 us sd on an idle box and 30 us sd with an editor indexing in the
+  background. Ruby cannot do better — while the main thread holds the GVL, the
+  generating thread cannot wake. Python has the same limitation with the GIL.
+- `RGBLED` will run three `SoftwarePWM` channels, so three generating threads
+  that each spin. One thread multiplexing three lines with batch `set_values`
+  would be cheaper and is the obvious optimisation if it proves necessary; for
+  LEDs the edge placement is invisible, so it has not been.
 
 **Open questions**
 
