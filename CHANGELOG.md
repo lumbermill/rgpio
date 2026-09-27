@@ -54,6 +54,21 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   `#display_on` / `#display_off`). Both take an `i2c:` to share a bus device, or
   open their own. Verified on Pi 5 with both modules on the header bus at once.
 - `examples/temperature.rb`, `lcd.rb`, `lcd_thermometer.rb`: I2C examples.
+- **Software PWM** (`Rgpio::SoftwarePWM`): PWM generated in Ruby on any GPIO
+  line, with no dtoverlay and no config.txt entry. `frequency=`, `duty_cycle=`,
+  `pulse_width_us=`, `enable`/`disable`, block-form `.open` — the same interface
+  as `HardwarePWM`, so the device classes take either. The generating thread
+  sleeps until shortly before each edge and then spins, capped at 5% of the
+  period. Measured on a Pi 5: a 50 Hz 1500 us pulse held to 6 us of standard
+  deviation for 2.7% of one core.
+- **PWM-backed devices**: `Rgpio::PWMLED` (brightness), `Rgpio::RGBLED` (three
+  channels, named colours, common-anode support via `active_low:`) and
+  `Rgpio::Servo` (`value`, `angle`, `min`/`mid`/`max`, `detach`, calibratable
+  pulse range). All default to software PWM and take `pwm: :hardware` — or a
+  channel object — to drive the PWM peripheral instead.
+- `examples/pwm_led.rb`, `rgb_led.rb`, `servo.rb`: PWM device examples.
+  `examples/pwm_jitter.rb` measures the waveform a PWM channel really produces,
+  using the kernel's edge timestamps and a jumper between two header pins.
 - `examples/led.rb`, `button.rb`, `motion_sensor.rb`, `motor.rb`: device-class
   examples. The `Chip` / `LineRequest` versions of the LED and button demos moved
   to `examples/lowlevel/`, so the top level shows the API most users want first.
@@ -65,7 +80,9 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   libgpiod v2 symbol and reports `Rgpio.available? == false` instead of raising
   when only v1 is present. The sysfs-only `HardwarePWM` stays usable there.
 - `Rgpio.available?` / `.version` helpers for probing the libgpiod library.
-- Examples: `examples/blink.rb`, `examples/button.rb`, `examples/servo.rb`.
+- Examples: `examples/blink.rb`, `examples/button.rb`. The `HardwarePWM` servo
+  demo moved to `examples/lowlevel/servo.rb`, since the top-level `servo.rb` now
+  shows the `Servo` device class.
 - Minitest suite covering chip-selection logic and PWM helpers.
 
 [Unreleased]: https://github.com/lumbermill/rgpio/commits/main

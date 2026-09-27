@@ -213,3 +213,103 @@ ruby examples/lcd_thermometer.rb
   SDA/SCL が入れ替わっている
 - LCDが真っ黒／真っ白のまま → ほぼコントラスト。コントラストだけは読み戻せないので
   値を振って確かめるしかない
+
+---
+
+# Phase 3c 実機チェックリスト（PWM）
+
+ソフトPWM（`Rgpio::SoftwarePWM`）を既定にした `PWMLED` / `RGBLED` / `Servo` です。
+**config.txt も dtoverlay も不要**で、どのGPIOでも使えます。
+
+## 0. 波形そのもの（済）
+
+ヘッダのGPIO23（16番ピン）とGPIO24（18番ピン）をジャンパ1本で直結し、カーネルの
+エッジタイムスタンプでパルス幅を実測しました。サーボもLEDも繋がずにクラスの
+写像を確認できるので、配線を変える前にここが通ることを確かめます。
+
+```bash
+ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
+```
+
+- [x] 50Hz/1500µs で 平均1504.9µs・標準偏差6.2µs（2026-09-27）
+- [x] `Servo` の value −1/0/+1 → 1004.8 / 1505.2 / 2004.6 µs、`angle = 45` → 1756.6 µs
+- [x] `PWMLED` の value 0.25/0.50/0.75 → duty 25.1 / 50.1 / 75.1 %、`active_low` で反転
+- [x] `RGBLED` の1チャンネルを0.6にして 60.1%（他2スレッド稼働中）
+- [x] 全項目で目標より 4〜8µs 長い一定オフセット（サーボで0.4°、校正で吸収できる範囲）
+
+## 1. LEDの明るさ（PWMLED）
+
+配線: Phase 3a の `examples/led.rb` と同じ。`GPIO4(7番)` → 1kΩ → LED長足 /
+LED短足 → `GND(6番)`
+
+```bash
+ruby examples/pwm_led.rb
+```
+
+- [ ] 3往復、なめらかに明るく暗くなる（カクつき・ちらつきがないか）
+- [ ] 最後に半分の明るさで1秒止まる
+- [ ] Ctrl+C で消灯して止まる
+
+## 2. フルカラーLED（RGBLED）
+
+配線（カソードコモン。長い足が共通でGNDへ）:
+`GPIO17(11番)` → 1kΩ → 赤 / `GPIO27(13番)` → 1kΩ → 緑 / `GPIO22(15番)` → 1kΩ → 青 /
+共通足 → `GND(9番)`
+
+アノードコモンのLEDなら共通足を3.3Vに入れて `active_low: true` を付けます。
+
+```bash
+ruby examples/rgb_led.rb
+```
+
+- [ ] 赤→緑→青→黄→シアン→マゼンタ→白 と1秒ごとに変わる
+- [ ] 色名どおりの色に見える（赤と青が入れ替わっていないか）
+- [ ] 最後の赤↔青のフェードがなめらか
+- [ ] Ctrl+C で消灯して止まる
+
+## 3. サーボ（Servo）
+
+配線: `GPIO4(7番)` → 信号線 / `5V(2番か4番)` → 電源 / `GND(6番)` → GND
+
+負荷がかかるとPiの5Vが落ちることがあります。**スイープ中にPiが再起動するようなら
+サーボは別電源にしてGNDだけ共通**にしてください。
+
+```bash
+ruby examples/servo.rb
+```
+
+- [ ] 中央 → 端 → 逆端 を2往復
+- [ ] `angle` スイープが**カクカクせず連続的**に動く（ここがPython版との差）
+- [ ] `detach` でホーンが自由に回る（力が抜ける）
+- [ ] Ctrl+C で止まる
+- [ ] 可動端でうなり・発熱があれば `min_pulse_us` / `max_pulse_us` を狭める
+
+## 4. Python版との比較（任意）
+
+同じサーボで gpiozero と比べると、Python側は200µs刻み（180°サーボで約18°刻み）
+なので、`angle` を1°ずつ動かしても**追従しない角度がある**のが見えます。
+
+```bash
+python3 -c "
+from gpiozero import Servo; from time import sleep
+s = Servo(4)
+for v in [-1, -0.9, -0.8, -0.7]:
+    s.value = v; print(v); sleep(1)
+"
+```
+
+- [ ] Python版は −1.0 と −0.9 で同じ位置に見える（Ruby版は動く）
+
+## 全部 ✅ になったら
+
+- [ ] README.md に `SoftwarePWM` / `PWMLED` / `RGBLED` / `Servo` を追記（確定仕様に昇格）
+- [ ] PLAN.md の 3c を ✅ に
+- [ ] CHANGELOG を確認してコミット
+
+## つまずいたら
+
+- LEDがちらつく → `PWMLED.new(4, frequency: 400)` など周波数を上げる
+- サーボが震える → 他プロセスの負荷でGVLが取られている。`spin_us` は既定300µsが最良。
+  それでも駄目なら `pwm: :hardware`（GPIO12/13/18/19、要dtoverlay）
+- `Device or resource busy` → そのラインを別プロセスが掴んでいる。`sudo lsof /dev/gpiochip0`
+- GPIO2/3 を使いたい → I2Cが有効だとSDA/SCLに取られている。Control Centre で切る

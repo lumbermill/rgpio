@@ -64,6 +64,17 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   positions under Python on a Pi 5, against continuous positioning here. At
   100 Hz / duty 0.5 (where 50% is exactly representable) the two are equivalent
   (2.5 us vs 2.9 us median error). Verified 2026-09-27.
+- Pi 5 PWM device classes (`Servo`, `PWMLED`, `RGBLED`, Trixie): verified against
+  the same GPIO23-to-GPIO24 loopback, which measures the waveform the classes
+  actually put on the line rather than trusting the arithmetic. `Servo` value
+  -1.0/0.0/+1.0 produced 1004.8/1505.2/2004.6 us, `angle = 45` produced 1756.6 us,
+  a 500..2500 us range produced 504.2 us at its minimum, and `detach` produced no
+  edges at all. `PWMLED` value 0.25/0.50/0.75 produced 25.1/50.1/75.1% duty,
+  `active_low: true` inverted it, and 400 Hz framed correctly. `RGBLED` set one
+  channel to 0.6 while its other two threads ran, and that channel measured 60.1%.
+  Every reading sat 4-8 us above target, the constant offset noted below.
+  Verified 2026-09-27. Still unverified: how it all looks on the actual servo,
+  LED and RGB LED.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -145,7 +156,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | 🟡 `SoftwarePWM` done + measured on Pi 5; device classes next |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | 🟢 classes done, verified electrically on Pi 5; awaiting the servo / LED themselves |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
@@ -202,7 +213,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   measured 6 us sd on an idle box and 30 us sd with an editor indexing in the
   background. Ruby cannot do better — while the main thread holds the GVL, the
   generating thread cannot wake. Python has the same limitation with the GIL.
-- `RGBLED` will run three `SoftwarePWM` channels, so three generating threads
+- `RGBLED` runs three `SoftwarePWM` channels, so three generating threads
   that each spin. One thread multiplexing three lines with batch `set_values`
   would be cheaper and is the obvious optimisation if it proves necessary; for
   LEDs the edge placement is invisible, so it has not been.

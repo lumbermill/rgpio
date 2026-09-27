@@ -1,76 +1,67 @@
 #!/usr/bin/env ruby
 
-# Drive a standard RC servo motor via hardware PWM on GPIO12.
+# Sweep an RC servo, positioned by value (-1..1) and by angle.
 #
 # Wiring:
-#   GPIO12 (pin 32, RP1 PWM channel 0) -- servo signal wire (usually yellow/orange)
-#   5 V    (pin 2 or 4)                -- servo power (red)
-#   GND    (pin 6 or any GND)          -- servo ground (brown/black)
+#   GPIO4 (pin 7)             -- servo signal (usually yellow or orange)
+#   5 V   (pin 2 or 4)        -- servo power (red)
+#   GND   (pin 6 or any GND)  -- servo ground (brown or black)
 #
-# Prerequisites — GPIO12 must be routed to RP1 PWM0. Two options:
+# A servo under load draws more than the Pi's 5 V rail likes to give; if the Pi
+# reboots mid-sweep, power the servo from its own supply with a common ground.
 #
-#   (A) No reboot, NOT persistent (gone after reboot) — apply at runtime:
-#         sudo dtoverlay pwm pin=12 func=4
-#       Undo with: sudo dtoverlay -r pwm
+# No dtoverlay and no config.txt entry: the pulses come from Rgpio::SoftwarePWM,
+# which measured 6 us of spread at this frame rate on an idle Pi 5 — about half a
+# degree. On GPIO12/13/18/19 you can pass pwm: :hardware for a peripheral-timed
+# pulse instead. examples/lowlevel/servo.rb drives the peripheral directly.
 #
-#   (B) Persistent — add to /boot/firmware/config.txt and reboot:
-#         dtoverlay=pwm,pin=12,func=4
-#
-# Verify either way:
-#   pinctrl get 12        # should show "a0" / PWM0_CHAN0, not "none"
-#   ls /sys/class/pwm/    # a second pwmchip (RP1 PWM0) appears
+# Pulse widths vary by servo. 1000..2000 us is the range every hobby servo
+# understands; widen it only as far as the datasheet allows, since a servo driven
+# past its travel buzzes and heats up.
 #
 # Run:
-#   sudo ruby examples/servo.rb
-#
-# The servo sweeps from minimum to maximum position and back, three times.
+#   ruby examples/servo.rb
 
 require_relative "../lib/rgpio"
 
-SERVO_GPIO     = 12
-FREQUENCY_HZ   = 50      # Standard servo frequency (20 ms period)
-PULSE_MIN_US   = 500     # 0.5 ms — full counter-clockwise (varies by servo)
-PULSE_CENTER_US = 1500   # 1.5 ms — center position
-PULSE_MAX_US   = 2500    # 2.5 ms — full clockwise (varies by servo)
-STEP_US        = 10      # microseconds per step
-STEP_DELAY     = 0.005   # seconds between steps
+SERVO_GPIO = 4
 
-def sweep(pwm, from_us, to_us, step_us, delay)
-  steps = ((to_us - from_us) / step_us.to_f).ceil.abs
-  direction = to_us > from_us ? 1 : -1
-  steps.times do |i|
-    pwm.pulse_width_us = from_us + (direction * i * step_us)
-    sleep delay
-  end
-  pwm.pulse_width_us = to_us
-  sleep delay
-end
+servo = Rgpio::Servo.new(SERVO_GPIO, min_pulse_us: 1000, max_pulse_us: 2000)
+puts "Servo on GPIO#{SERVO_GPIO}, #{servo.pwm.frequency} Hz frames. Ctrl-C to stop."
 
-puts "libgpiod version: #{Rgpio.version}"
-puts "Available PWM chips: #{Rgpio::HardwarePWM.available_chips.inspect}"
-puts "Driving servo on GPIO#{SERVO_GPIO} at #{FREQUENCY_HZ} Hz."
+begin
+  puts "centre (#{servo.pulse_width_us.round} us)"
+  sleep 1
 
-Rgpio::HardwarePWM.open(gpio: SERVO_GPIO) do |pwm|
-  puts "Using pwmchip#{pwm.chip_num}, channel #{pwm.channel}"
-  pwm.frequency  = FREQUENCY_HZ
-  pwm.duty_cycle = 0.0 # start with duty=0 before enabling
-  pwm.enable
-
-  # Move to center first
-  pwm.pulse_width_us = PULSE_CENTER_US
-  sleep 0.5
-
-  3.times do |run|
-    puts "Sweep #{run + 1}/3: min → max → min"
-    sweep(pwm, PULSE_CENTER_US, PULSE_MAX_US, STEP_US, STEP_DELAY)
-    sweep(pwm, PULSE_MAX_US, PULSE_MIN_US, STEP_US, STEP_DELAY)
-    sweep(pwm, PULSE_MIN_US, PULSE_CENTER_US, STEP_US, STEP_DELAY)
-    sleep 0.3
+  2.times do
+    puts "one end"
+    servo.min
+    sleep 1
+    puts "the other"
+    servo.max
+    sleep 1
   end
 
-  puts "Done. Returning to center."
-  pwm.pulse_width_us = PULSE_CENTER_US
+  servo.mid
   sleep 0.5
-end
 
-puts "PWM disabled and unexported."
+  puts "sweeping by angle"
+  2.times do
+    (-90..90).step(2) do |degrees|
+      servo.angle = degrees
+      sleep 0.01
+    end
+    (-90..90).step(2).reverse_each do |degrees|
+      servo.angle = degrees
+      sleep 0.01
+    end
+  end
+
+  puts "detaching — the horn goes limp and the servo stops drawing current"
+  servo.detach
+  sleep 1
+rescue Interrupt
+  puts "\nStopped."
+ensure
+  servo.close
+end
