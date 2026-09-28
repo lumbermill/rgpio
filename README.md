@@ -830,7 +830,8 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  LED / Button / Motor / ADT7410 / ST7032                │  device classes (gpiozero-style)
+│  LED / Button / Motor / PWMLED / RGBLED / Servo         │  device classes (gpiozero-style)
+│  ADT7410 / ST7032                                       │  (one object per part)
 ├─────────────────────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────┬───────────────────┤
