@@ -32,11 +32,11 @@ class I2CTest < Minitest::Test
     assert_equal 2, data[Fiddle::SIZEOF_VOIDP, 4].unpack1("L")
   end
 
-  def test_pack_bytes_accepts_integers_strings_and_arrays
-    assert_equal "\x40Hi".b, Rgpio::I2C.pack_bytes([0x40, "Hi"])
-    assert_equal "\x00\x38".b, Rgpio::I2C.pack_bytes([0x00, 0x38])
-    assert_equal "\x40\x01\x02".b, Rgpio::I2C.pack_bytes([0x40, [1, 2]])
-    assert_empty Rgpio::I2C.pack_bytes([])
+  def test_bytes_pack_accepts_integers_strings_and_arrays
+    assert_equal "\x40Hi".b, Rgpio::Bytes.pack([0x40, "Hi"])
+    assert_equal "\x00\x38".b, Rgpio::Bytes.pack([0x00, 0x38])
+    assert_equal "\x40\x01\x02".b, Rgpio::Bytes.pack([0x40, [1, 2]])
+    assert_empty Rgpio::Bytes.pack([])
   end
 
   def test_buses_lists_device_nodes_as_sorted_integers

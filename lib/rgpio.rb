@@ -4,7 +4,9 @@ require_relative "rgpio/chip"
 require_relative "rgpio/line_request"
 require_relative "rgpio/pwm"
 require_relative "rgpio/software_pwm"
+require_relative "rgpio/bytes"
 require_relative "rgpio/i2c"
+require_relative "rgpio/spi"
 require_relative "rgpio/devices/device"
 require_relative "rgpio/devices/output_device"
 require_relative "rgpio/devices/input_device"
@@ -15,6 +17,7 @@ require_relative "rgpio/devices/rgb_led"
 require_relative "rgpio/devices/servo"
 require_relative "rgpio/devices/adt7410"
 require_relative "rgpio/devices/st7032"
+require_relative "rgpio/devices/mcp3208"
 
 # Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
 # the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
@@ -61,6 +64,9 @@ module Rgpio
 
   # Raised for I2C-related errors not reported as an Errno by the kernel.
   class I2CError < Error; end
+
+  # Raised for SPI-related errors not reported as an Errno by the kernel.
+  class SPIError < Error; end
 
   # @return [Boolean] whether the libgpiod shared library is loaded
   def self.available?

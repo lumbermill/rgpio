@@ -160,7 +160,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
+| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | 🟡 written + unit-tested; awaiting a loopback jumper and the converter |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
 I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
@@ -236,6 +236,29 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   running an InGaN die at a fraction of its current shifts the colour slightly.
   The scale factor also travels with the code. `balance:` is per-part, so the gem
   defaults to no correction and `examples/rgb_balance.rb` finds the value by eye.
+
+**Phase 3d notes**
+
+- `Rgpio::SPI` builds its ioctl numbers from the encoding rather than writing
+  them out (`ioctl_number(direction, request, size)`), and the unit tests assert
+  the results against the values in `<linux/spi/spidev.h>`. The struct is exactly
+  32 bytes and the header promises the same layout in 32- and 64-bit userspace,
+  so unlike `i2c_msg` there is nothing architecture-dependent to get wrong. Its
+  two buffer fields are `__u64` even on a 32-bit system, so they pack as "Q",
+  never "J".
+- Every SPI transfer is full duplex, so `#transfer` answers with as many bytes as
+  it was given, and `#write` / `#read` are that transfer with one direction
+  ignored. There is no equivalent of I2C's repeated-START question.
+- On this Pi 5, `/dev/spidev0.0` and `0.1` are the header bus and `/dev/spidev10.0`
+  is something else entirely; GPIO8 (CE0) shows as a plain output held high
+  because the driver manages chip select as a GPIO. Both are normal.
+- **Clock rate is a correctness question for the MCP3208, not just a speed one.**
+  The datasheet allows 1 MHz at 2.7 V and 2 MHz at 5 V; clocked faster than its
+  sampling rate the part returns plausible, wrong numbers. The default is 1 MHz,
+  inside the envelope for the 3.3 V supply the Pi gives it.
+- The MCP3204 is the same protocol with four channels, so `channels: 4` covers it.
+  The MCP3008 is *not* — it is 10-bit with a different command byte — and is not
+  implemented, since no book sample needs it.
 
 **Open questions**
 

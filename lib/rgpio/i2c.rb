@@ -59,14 +59,6 @@ module Rgpio
       ([msgs_addr].pack("J") + [count].pack("L")).ljust(RDWR_SIZE, "\0")
     end
 
-    # Flatten a write argument list into the bytes to put on the bus, so that
-    # `write(0x40, "Hi")` and `write(0x40, 0x48, 0x69)` mean the same thing.
-    # @param bytes [Array<Integer, String, Array>]
-    # @return [String] binary string
-    def self.pack_bytes(bytes)
-      Array(bytes).flatten.map { |b| b.is_a?(String) ? b.b : [b].pack("C") }.join
-    end
-
     # @return [Array<Integer>] bus numbers with a /dev/i2c-N node, ascending
     def self.buses
       Dir.glob("/dev/i2c-*").filter_map { |path| path[%r{/dev/i2c-(\d+)\z}, 1]&.to_i }.sort
@@ -120,7 +112,7 @@ module Rgpio
     # @param bytes [Array<Integer>, String] byte values, or a packed String
     # @return [Integer] number of bytes written
     def write(*bytes)
-      @io.syswrite(self.class.pack_bytes(bytes))
+      @io.syswrite(Bytes.pack(bytes))
     end
 
     # Read bytes in a single transaction.
@@ -137,7 +129,7 @@ module Rgpio
     # @param count [Integer] how many bytes to read back
     # @return [Array<Integer>]
     def write_read(bytes, count)
-      out = self.class.pack_bytes(bytes)
+      out = Bytes.pack(bytes)
       raise ArgumentError, "write_read needs at least one byte to write" if out.empty?
       raise ArgumentError, "count must be positive, got #{count}" unless count.positive?
 

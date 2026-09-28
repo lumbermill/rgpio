@@ -54,6 +54,15 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   `#display_on` / `#display_off`). Both take an `i2c:` to share a bus device, or
   open their own. Verified on Pi 5 with both modules on the header bus at once.
 - `examples/temperature.rb`, `lcd.rb`, `lcd_thermometer.rb`: I2C examples.
+- **SPI support via the Linux spidev interface** (`Rgpio::SPI`): full-duplex
+  `transfer`, `write`, `read`, `mode=`, `speed_hz=`, `bits_per_word=`, block-form
+  `.open` and `.devices`. Like the I2C support it is `ioctl` work on a character
+  device, so it needs no libgpiod.
+- **`Rgpio::MCP3208`**: eight 12-bit ADC channels (`read` for the raw code,
+  `value` for a ratio, `voltage` for volts, `read_all`, plus differential pairs).
+  `channels: 4` covers the MCP3204, which shares the protocol.
+- `examples/adc.rb` prints every channel; `examples/adc_led.rb` dims an LED from
+  a potentiometer, tying the ADC to `PWMLED`.
 - **Software PWM** (`Rgpio::SoftwarePWM`): PWM generated in Ruby on any GPIO
   line, with no dtoverlay and no config.txt entry. `frequency=`, `duty_cycle=`,
   `pulse_width_us=`, `enable`/`disable`, block-form `.open` — the same interface
