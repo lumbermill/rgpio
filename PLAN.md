@@ -78,6 +78,14 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   showed every named colour correctly once balanced, and a servo swept
   continuously by angle — the step-free sweep being exactly what Python cannot do
   here — with `detach` releasing the horn.
+- Pi 5 SPI bus layer (`Rgpio::SPI`, Trixie, `/dev/spidev0.0`): verified with a
+  jumper from GPIO10 (MOSI, pin 19) to GPIO9 (MISO, pin 21), which makes every
+  byte sent come straight back — the data path cannot be confirmed without it,
+  since an unconnected MISO reads 0x00 whether the implementation is right or
+  wrong. A six-byte pattern, 64 bytes, a single byte and a String argument all
+  came back identical, at 100 kHz, 1, 4, 16 and 32 MHz, in all four SPI modes;
+  `read` clocked zeros out and `write` reported the byte count. Verified
+  2026-09-28.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -87,6 +95,8 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 - Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
   behaviour under load. The `i2c_msg` struct layout is 32-bit-aware (the buffer
   pointer sits at offset 8 either way) but has only been exercised on aarch64.
+- `Rgpio::MCP3208` — the protocol is unit-tested against the datasheet's command
+  and frame format, but no converter has been on the bus yet.
 - `Rgpio::ST7032` on a 16-column AQM1602, and on a 5 V module (`booster: false`);
   only the 8x2 AQM0802 at 3.3 V has been on the bus.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
@@ -160,7 +170,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | 🟡 written + unit-tested; awaiting a loopback jumper and the converter |
+| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | 🟢 `SPI` verified on Pi 5 (loopback); the converter itself next |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
 I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
