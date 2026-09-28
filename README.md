@@ -588,6 +588,80 @@ controller cannot read back — sweep `contrast:` across 0x10..0x38. Modules run
 
 ---
 
+## SPI Usage
+
+`Rgpio::SPI` talks to a device on a Linux spidev bus (`/dev/spidevB.D`). Like the
+I2C support it is `ioctl` work on a character device, so it needs no libgpiod.
+
+### Step 1 — Enable the header bus
+
+SPI0 is off by default. On the header it is GPIO10 (MOSI), GPIO9 (MISO), GPIO11
+(SCLK), GPIO8 (CE0) and GPIO7 (CE1):
+
+```sh
+sudo raspi-config nonint do_spi 0   # or add dtparam=spi=on to /boot/firmware/config.txt
+```
+
+```sh
+ls /dev/spidev0.0
+```
+
+```ruby
+Rgpio::SPI.devices    # => [[0, 0], [0, 1]]  as [bus, chip-select]
+```
+
+### Step 2 — Talk to a device
+
+```ruby
+Rgpio::SPI.open(bus: 0, device: 0, speed_hz: 1_000_000) do |spi|
+  # SPI is full duplex: one byte goes out for every byte that comes in, so
+  # #transfer answers with as many bytes as it was given.
+  received = spi.transfer([0x06, 0x00, 0x00])
+
+  spi.write(0x40, "Hello")   # transfer, ignoring what came back
+  spi.read(4)                # transfer of zeros, keeping what came back
+end
+```
+
+`mode:` selects clock polarity and phase (0..3), and `speed_hz`, `mode` and
+`bits_per_word` can all be changed on an open device. A single transfer can take
+a `speed_hz:` of its own.
+
+Failures surface as the kernel's own `Errno` exceptions — `Errno::EACCES` when
+the user is not in the `spi` group, `Errno::ENODEV` when the bus is not enabled.
+
+### Analogue input — `Rgpio::MCP3208`
+
+Eight 12-bit channels over SPI, the MCP3204's four channels being the same part
+and protocol.
+
+```ruby
+adc = Rgpio::MCP3208.new                 # bus 0, CE0, 1 MHz, VREF 3.3 V
+adc.read(0)                              # => 0..4095, the raw code
+adc.value(0)                             # => 0.0..1.0, a fraction of VREF
+adc.voltage(0)                           # => volts
+adc.read_all                             # => every channel, consecutively
+adc.read(0, differential: true)          # => the CH0/CH1 pair rather than CH0
+adc.close
+```
+
+```ruby
+adc = Rgpio::MCP3208.new(channels: 4, reference_voltage: 5.0, speed_hz: 500_000)
+```
+
+Wiring: VDD **and VREF** to 3.3 V, AGND and DGND to ground, CLK/DOUT/DIN to
+SCLK/MISO/MOSI, CS to CE0. A forgotten VREF is the usual reason every channel
+reads 0 or sticks at full scale.
+
+The clock rate is a matter of correctness, not just speed: the datasheet allows
+1 MHz at 2.7 V and 2 MHz at 5 V, and a converter clocked past its sampling rate
+answers with values that look plausible and are wrong. The 1 MHz default is
+inside the envelope for the 3.3 V supply a Pi provides.
+
+Unconnected channels float and read whatever is nearby; that is not a fault.
+
+---
+
 ## Running the examples
 
 All examples require root (or `gpio` group membership):
@@ -625,6 +699,12 @@ ruby examples/lcd.rb
 
 # Show the temperature on the LCD — both I2C devices on one bus
 ruby examples/lcd_thermometer.rb
+
+# Print all eight channels of an MCP3208
+ruby examples/adc.rb
+
+# Dim an LED from a potentiometer through the MCP3208
+ruby examples/adc_led.rb
 ```
 
 `examples/lowlevel/` holds the same LED and button demos written directly
@@ -727,6 +807,32 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | `#write_register(register, *bytes)` | Write a register in one transaction |
 | `#address` / `#bus` / `#path` | What this device was opened on |
 | `#close` / `#closed?` | Close the bus device |
+
+### `Rgpio::SPI`
+
+| Method | Description |
+|---|---|
+| `.new(bus: 0, device: 0, speed_hz:, mode:, bits_per_word:)` | Open `/dev/spidevB.D` |
+| `.open(...) { \|spi\| }` | Block form; closes on exit |
+| `.devices` | `[bus, chip-select]` of every spidev node |
+| `#transfer(bytes, speed_hz:, delay_us:)` | Full-duplex transfer → `Array<Integer>` |
+| `#write(*bytes)` | Transfer, ignoring what came back |
+| `#read(count)` | Transfer of zeros, keeping what came back |
+| `#speed_hz` / `#mode` / `#bits_per_word` (and `=`) | Bus settings |
+| `#bus` / `#device` / `#path` | What this device was opened on |
+| `#close` / `#closed?` | Close the bus device |
+
+### `Rgpio::MCP3208`
+
+| Method | Description |
+|---|---|
+| `.new(channels:, reference_voltage:, bus:, device:, speed_hz:, spi:)` | Open the converter; `spi:` shares a bus device |
+| `#read(channel, differential: false)` | Raw code, 0..4095 |
+| `#value(channel, ...)` | Fraction of VREF, 0.0..1.0 |
+| `#voltage(channel, ...)` | Volts |
+| `#read_all` | Every channel, sampled consecutively |
+| `#channels` / `#reference_voltage` / `#spi` | What it was configured with |
+| `#close` / `#closed?` | Close the bus device, if this converter opened it |
 
 ### `Rgpio::ADT7410`
 
@@ -831,20 +937,20 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  LED / Button / Motor / PWMLED / RGBLED / Servo         │  device classes (gpiozero-style)
-│  ADT7410 / ST7032                                       │  (one object per part)
+│  ADT7410 / ST7032 / MCP3208                             │  (one object per part)
 ├─────────────────────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────┬───────────────────┤
-│  Native (fiddle) │  HardwarePWM     │  I2C              │  libgpiod.so / sysfs PWM / i2c-dev
+│  Native (fiddle) │  HardwarePWM     │  I2C / SPI        │  libgpiod.so / sysfs PWM / i2c-dev
 │  SoftwarePWM     │                  │                   │  (PWM timed in Ruby on any line)
 └──────────────────┴──────────────────┴───────────────────┘
-     libgpiod v2 ABI    Linux PWM sysfs    /dev/i2c-N ioctl
+     libgpiod v2 ABI    Linux PWM sysfs    /dev/i2c-N, /dev/spidev ioctl
 ```
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
-- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `SoftwarePWM`, `I2C`)** — Ruby-idiomatic wrappers
+- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `SoftwarePWM`, `I2C`, `SPI`)** — Ruby-idiomatic wrappers
 - **Layer 3 (`LED`, `Button`, `Motor`, `PWMLED`, `RGBLED`, `Servo`, `ADT7410`,
-  `ST7032`)** — one object per piece of hardware
+  `ST7032`, `MCP3208`)** — one object per piece of hardware
 
 ---
 
