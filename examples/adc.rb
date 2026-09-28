@@ -14,8 +14,13 @@
 #   pin 16    VDD        -- 3.3 V
 #
 # A potentiometer to try it with: one end to 3.3 V, the other to GND, the wiper
-# to CH0. Unconnected channels float and read whatever is nearby, which is not a
-# fault.
+# to CH0. A 10k pot is the one to reach for: 1k wastes 3.3 mA across it for no
+# gain in accuracy.
+#
+# Unconnected channels are not faulty and not arbitrary either — they mirror
+# whatever is going on nearby. Measured here: with every channel unconnected they
+# read codes 0-10, and with one channel tied to 3.3 V and sampled repeatedly the
+# floating ones rose to a mean near 15 with excursions past 400.
 #
 # Prerequisite — the header SPI bus must be enabled:
 #   sudo raspi-config nonint do_spi 0     # or: dtparam=spi=on in config.txt
