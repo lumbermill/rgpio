@@ -91,7 +91,14 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   1..3929 with 245 distinct values out of 550 samples — the top end short of 4095
   only because the knob stopped short of its travel. Repeated reads of a still
   input scattered by 0.42 LSB (0.34 mV), and the reading did not move between
-  100 kHz and 2 MHz. Verified 2026-09-29.
+  100 kHz and 2 MHz. Absolute ends confirmed by wiring CH1 to 3.3 V and CH2 to
+  ground: CH1 reached code **4095** (mean 4090.1, sd 7.0) and CH2 read 0..1 (mean
+  1.00, an offset of about 1 LSB or 0.8 mV). Neither mean sits exactly on its end
+  code, and that is arithmetic rather than error — with the input at the same
+  potential as VREF, noise can only move a sample downwards, so the distribution
+  is clipped and its mean must fall short. A potentiometer's wiper is a
+  high-impedance source and reads noisier than a rail: 27 LSB against 7.
+  Verified 2026-09-29.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -269,7 +276,10 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - **Clock rate is a correctness question for the MCP3208, not just a speed one.**
   The datasheet allows 1 MHz at 2.7 V and 2 MHz at 5 V; clocked faster than its
   sampling rate the part returns plausible, wrong numbers. The default is 1 MHz,
-  inside the envelope for the 3.3 V supply the Pi gives it.
+  inside the envelope for the 3.3 V supply the Pi gives it. **Measured** with CH1
+  tied to 3.3 V: the mean code held at 4086-4087 from 100 kHz through 2 MHz and
+  dropped to 4077 at 4 MHz — a 9 LSB droop, the datasheet limit becoming visible,
+  and exactly the kind of error that looks like a plausible reading.
 - The MCP3204 is the same protocol with four channels, so `channels: 4` covers it.
   The MCP3008 is *not* — it is 10-bit with a different command byte — and is not
   implemented, since no book sample needs it.
