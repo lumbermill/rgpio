@@ -56,8 +56,9 @@ gem install rgpio
 
 ## Device API
 
-`LED`, `Button` and `Motor` wrap `Chip` / `LineRequest` in one object per piece
-of hardware, in the style of Python's gpiozero. A device opens its own chip
+`LED`, `Button`, `Motor`, `PWMLED`, `RGBLED` and `Servo` wrap `Chip` /
+`LineRequest` in one object per piece of hardware, in the style of Python's
+gpiozero. A device opens its own chip
 unless you hand it one with `chip:`, and `#close` releases only what it owns.
 Devices still under hardware validation are listed in [PLAN.md](PLAN.md).
 
@@ -132,6 +133,80 @@ before raising the other so the driver is never asked to source and sink the
 same output at once. Wire the motor across the driver's two outputs
 (`AOUT1`/`AOUT2`) — with one terminal on GND only one direction works. Speed
 control would need PWM on both lines and is not implemented.
+
+### PWMLED
+
+`LED` is on or off; `PWMLED` has a level in between, from a PWM channel.
+
+```ruby
+led = Rgpio::PWMLED.new(4)
+led.value = 0.25            # a quarter bright (#brightness is an alias)
+led.on                      # 1.0
+led.toggle                  # inverts the level: 0.25 becomes 0.75
+led.close
+```
+
+The level holds with no further calls — one assignment, and the channel keeps
+generating. Any line works: the default channel is {Rgpio::SoftwarePWM}, which
+needs no dtoverlay. See [Software PWM](#software-pwm) for `pwm: :hardware`.
+
+### RGBLED
+
+Three PWM channels as one object, one per colour.
+
+```ruby
+led = Rgpio::RGBLED.new(red: 17, green: 27, blue: 22)
+led.color = :magenta        # or any name in Rgpio::RGBLED::COLORS
+led.color = [1.0, 0.4, 0.0] # or a triple, 0.0..1.0 each
+led.blue = 0.5              # or one channel at a time
+led.off
+led.close
+```
+
+The default wiring is common cathode: each line drives its colour through its own
+resistor and the common leg goes to GND. For a common-anode part, tie the common
+leg to 3.3 V and pass `active_low: true`.
+
+White comes out tinted unless the channels are scaled to match, because the three
+dies are not equally bright for equal duty:
+
+```ruby
+led = Rgpio::RGBLED.new(red: 17, green: 27, blue: 22, balance: [1.0, 0.8, 0.8])
+```
+
+`balance:` scales every level asked for, so named colours come out right too, and
+`#color` keeps reporting what was asked for. The right value belongs to the part,
+not to the gem — `ruby examples/rgb_balance.rb` steps through candidates with the
+LED showing white so you can pick one by eye.
+
+### Servo
+
+```ruby
+servo = Rgpio::Servo.new(4)
+servo.max                   # one end of the travel
+servo.mid                   # centre
+servo.angle = 45            # or by angle, -90..90 by default
+servo.detach                # stop the pulses: the horn goes limp
+servo.close
+```
+
+A servo holds its position only while pulses keep arriving, so `#detach` stops
+sending them: the horn can then be turned by hand, and the servo stops drawing
+the current — and making the heat — of holding against a load. It has no grip on
+anything while detached. Setting `#value` or `#angle` again resumes;
+`#attached?` reports which it is.
+
+Pulse widths vary by servo. The default 1000..2000 us is the range every hobby
+servo understands, and many reach further:
+
+```ruby
+servo = Rgpio::Servo.new(4, min_pulse_us: 500, max_pulse_us: 2500,
+                            min_angle: 0, max_angle: 180)
+servo.pulse_width_us = 2300 # drive a width directly, to find the real travel
+```
+
+A servo driven past its travel buzzes and heats up, so widen the range only as
+far as the part allows, and by measuring rather than by trusting.
 
 ### Sharing one chip
 
@@ -232,6 +307,54 @@ end
 | `active_low:` | `true` / `false` | `false` | |
 | `initial_value:` | `:active`, `:inactive` | `:inactive` | Output only |
 | `consumer:` | String | `nil` | Shown in `gpioinfo` |
+
+---
+
+## Software PWM
+
+`Rgpio::SoftwarePWM` generates PWM in Ruby on any GPIO line. It needs no
+dtoverlay and no config.txt entry, which is why the device classes above use it
+by default.
+
+```ruby
+Rgpio::SoftwarePWM.open(18) do |pwm|
+  pwm.frequency  = 100
+  pwm.duty_cycle = 0.25
+  pwm.enable
+  sleep 2
+  pwm.pulse_width_us = 1500   # or set the high time directly
+end
+```
+
+It presents the same interface as `HardwarePWM` — `frequency=`, `duty_cycle=`,
+`pulse_width_us=`, `enable`/`disable`, `close` — so the device classes take
+either. Pass `pwm: :hardware` on GPIO12/13/18/19 for the peripheral instead:
+
+```ruby
+servo = Rgpio::Servo.new(12, pwm: :hardware)   # needs the dtoverlay, see below
+led   = Rgpio::PWMLED.new(13, pwm: channel)    # or share a channel you own
+```
+
+### Which to use
+
+| | Software PWM | Hardware PWM |
+|---|---|---|
+| Setup | none | `dtoverlay` in config.txt |
+| Lines | any | GPIO12/13/18/19, two at a time on the header |
+| Accuracy | 6 us of spread at 50 Hz on an idle Pi 5 | exact |
+| Cost | 2.7% of one core per channel at 50 Hz | none |
+
+The generating thread sleeps until shortly before each edge and then spins for
+the last `spin_us` (300 by default, capped at 5% of the period), because sleeping
+the whole way overshoots a microsecond-scale deadline badly. Spinning holds the
+GVL, which is where the CPU figure comes from.
+
+Measured on a Pi 5 with a jumper between two header pins and the kernel's own
+edge timestamps (`examples/pwm_jitter.rb`): a 50 Hz 1500 us pulse — a servo's
+centre — came out at 1504.9 us with 6.2 us of standard deviation, or about half a
+degree of travel. A busy machine widens that: while the main thread holds the
+GVL, the generating thread cannot wake. Python has the same limitation with the
+GIL, and gpiozero's PWM is software-timed too.
 
 ---
 
@@ -479,8 +602,17 @@ ruby examples/button.rb
 # Drive a DC motor forward and backward through a DRV8835
 ruby examples/motor.rb
 
-# Servo sweep on GPIO12 (dtoverlay must be configured first)
-sudo ruby examples/servo.rb
+# Fade an LED with PWM on GPIO4
+ruby examples/pwm_led.rb
+
+# Cycle a full-colour LED through the colour cube on GPIO17/27/22
+ruby examples/rgb_led.rb
+
+# Find the per-channel balance that makes that LED's white look white
+ruby examples/rgb_balance.rb
+
+# Sweep a servo on GPIO4, by value and by angle
+ruby examples/servo.rb
 
 # Report which PWM chip and channel each header GPIO resolves to
 ruby examples/pwm_info.rb
@@ -502,6 +634,16 @@ not expose:
 ```sh
 sudo ruby examples/lowlevel/blink.rb
 sudo ruby examples/lowlevel/button.rb
+
+# The servo driven straight from the PWM peripheral (dtoverlay required)
+sudo ruby examples/lowlevel/servo.rb
+```
+
+`examples/pwm_jitter.rb` measures what a PWM channel really puts on the line,
+using the kernel's edge timestamps and a jumper between two header pins:
+
+```sh
+ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 ```
 
 ---
@@ -616,6 +758,56 @@ sudo ruby examples/lowlevel/button.rb
 | `#columns` / `#rows` / `#i2c` | Geometry, and the bus device writes go through |
 | `#close` / `#closed?` | Close the bus device, if this display opened it |
 
+### `Rgpio::SoftwarePWM`
+
+| Method | Description |
+|---|---|
+| `.new(gpio, frequency:, duty_cycle:, spin_us:, chip:, consumer:)` | Claim a line and prepare a channel |
+| `.open(gpio, ...) { \|pwm\| }` | Block form; closes on exit |
+| `#frequency` / `#frequency=` | Hz, 0.1..10000 |
+| `#duty_cycle` / `#duty_cycle=` | 0.0..1.0 (`#duty_ratio` is an alias) |
+| `#pulse_width_us` / `#pulse_width_us=` | High time in microseconds |
+| `#enable` / `#disable` / `#enabled?` | Start and stop generating |
+| `#spin_us` | Microseconds spent spinning before each edge |
+| `#close` / `#closed?` | Stop, release the line, close an owned chip |
+
+### `Rgpio::PWMOutputDevice` (and `Rgpio::PWMLED`)
+
+| Method | Description |
+|---|---|
+| `.new(gpio, frequency:, initial_value:, active_low:, pwm:, chip:, consumer:)` | Drive a line from a PWM channel |
+| `#value` / `#value=` | Level, 0.0..1.0 (`#brightness` on `PWMLED`) |
+| `#on` / `#off` / `#toggle` | 1.0 / 0.0 / the complement of the current level |
+| `#on?` | True when not fully off (`#active?` is an alias) |
+| `#frequency` / `#frequency=` | Delegated to the channel |
+| `#pwm` | The channel behind this device |
+| `#close` / `#closed?` | Stop the channel, releasing it if the device opened it |
+
+### `Rgpio::RGBLED`
+
+| Method | Description |
+|---|---|
+| `.new(red:, green:, blue:, frequency:, active_low:, balance:, pwm:, chip:, consumer:)` | Three channels as one device |
+| `#color` / `#color=` | An r,g,b triple, or a name from `COLORS` |
+| `#red` / `#green` / `#blue` (and `=`) | One channel at a time |
+| `#balance` / `#balance=` | Per-channel scale under every level asked for |
+| `#on` / `#off` / `#toggle` | White / dark / the complement of each channel |
+| `#on?` | True when any channel is lit |
+| `#channels` | The three `PWMLED`s, by colour |
+| `#close` / `#closed?` | Stop all three, close an owned chip |
+
+### `Rgpio::Servo`
+
+| Method | Description |
+|---|---|
+| `.new(gpio, min_pulse_us:, max_pulse_us:, frequency:, min_angle:, max_angle:, initial_value:, pwm:, chip:, consumer:)` | Claim a line and centre the servo |
+| `#value` / `#value=` | -1.0..1.0, or nil to detach |
+| `#angle` / `#angle=` | Degrees between `min_angle` and `max_angle` |
+| `#min` / `#mid` / `#max` | The ends of the travel and the centre |
+| `#pulse_width_us` / `#pulse_width_us=` | The width being sent; assigning one calibrates by hand |
+| `#detach` / `#attached?` | Stop the pulses so the horn goes limp / report whether they are running |
+| `#close` / `#closed?` | Stop the channel, releasing it if the servo opened it |
+
 ### `Rgpio::HardwarePWM`
 
 | Method | Description |
@@ -643,17 +835,15 @@ sudo ruby examples/lowlevel/button.rb
 │  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────┬───────────────────┤
 │  Native (fiddle) │  HardwarePWM     │  I2C              │  libgpiod.so / sysfs PWM / i2c-dev
+│  SoftwarePWM     │                  │                   │  (PWM timed in Ruby on any line)
 └──────────────────┴──────────────────┴───────────────────┘
      libgpiod v2 ABI    Linux PWM sysfs    /dev/i2c-N ioctl
 ```
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
-- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `I2C`)** — Ruby-idiomatic wrappers
-- **Layer 3 (`LED`, `Button`, `Motor`, `ADT7410`, `ST7032`)** — one object per
-  piece of hardware
-
-The PWM-backed devices (`PWMLED`, `Servo`, `RGBLED`) are still planned; see
-[PLAN.md](PLAN.md).
+- **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `SoftwarePWM`, `I2C`)** — Ruby-idiomatic wrappers
+- **Layer 3 (`LED`, `Button`, `Motor`, `PWMLED`, `RGBLED`, `Servo`, `ADT7410`,
+  `ST7032`)** — one object per piece of hardware
 
 ---
 

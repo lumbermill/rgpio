@@ -10,7 +10,7 @@ is considered confirmed and supported; anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a + 3b verified on Pi 5 (`MotionSensor` deferred); 3c–3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a + 3b + 3c verified on Pi 5 (`MotionSensor` deferred); 3d–3e pending |
 
 ## Multi-board support — validation status
 
@@ -73,8 +73,11 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   `active_low: true` inverted it, and 400 Hz framed correctly. `RGBLED` set one
   channel to 0.6 while its other two threads ran, and that channel measured 60.1%.
   Every reading sat 4-8 us above target, the constant offset noted below.
-  Verified 2026-09-27. Still unverified: how it all looks on the actual servo,
-  LED and RGB LED.
+  Verified 2026-09-27. The parts themselves followed on 2026-09-28: an LED faded
+  smoothly and held each fixed level without flicker down to 5% duty, an RGB LED
+  showed every named colour correctly once balanced, and a servo swept
+  continuously by angle — the step-free sweep being exactly what Python cannot do
+  here — with `detach` releasing the horn.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
@@ -156,7 +159,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | 🟢 classes done, verified electrically on Pi 5; awaiting the servo / LED themselves |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ⬜ |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 

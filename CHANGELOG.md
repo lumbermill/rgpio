@@ -65,7 +65,9 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   channels, named colours, common-anode support via `active_low:`) and
   `Rgpio::Servo` (`value`, `angle`, `min`/`mid`/`max`, `detach`, calibratable
   pulse range). All default to software PWM and take `pwm: :hardware` — or a
-  channel object — to drive the PWM peripheral instead.
+  channel object — to drive the PWM peripheral instead. `RGBLED` takes a
+  `balance:` scale per channel, because an RGB LED's three dies are not equally
+  bright for equal duty and its white comes out tinted without one.
 - `examples/pwm_led.rb`, `rgb_led.rb`, `servo.rb`: PWM device examples.
   `examples/pwm_jitter.rb` measures the waveform a PWM channel really produces,
   using the kernel's edge timestamps and a jumper between two header pins.

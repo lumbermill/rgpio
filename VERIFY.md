@@ -272,7 +272,8 @@ ruby examples/rgb_led.rb
 - [x] 赤↔青のフェードがなめらか（3スレッドのソフトPWMが同時稼働）
 - [x] **白が青っぽい → `balance: [1.0, 0.8, 0.8]` で補正**（赤が弱いチャンネル。
       個体差なので `ruby examples/rgb_balance.rb` で各自校正する）
-- [ ] Ctrl+C で消灯して止まる
+- [x] Ctrl+C で消灯して止まる
+- [x] 補正後は黄色もはっきりした（混色の比率が正しくなった）
 
 ## 3. サーボ（Servo）
 
@@ -285,11 +286,11 @@ ruby examples/rgb_led.rb
 ruby examples/servo.rb
 ```
 
-- [ ] 中央 → 端 → 逆端 を2往復
-- [ ] `angle` スイープが**カクカクせず連続的**に動く（ここがPython版との差）
-- [ ] `detach` でホーンが自由に回る（力が抜ける）
-- [ ] Ctrl+C で止まる
-- [ ] 可動端でうなり・発熱があれば `min_pulse_us` / `max_pulse_us` を狭める
+- [x] 中央 → 端 → 逆端 を2往復（2026-09-28）
+- [x] `angle` スイープが**カクカクせず連続的**に動く（Python版との差が出る項目）
+- [x] `detach` でホーンが自由に回る（力が抜ける）
+- [x] Ctrl+C で止まる
+- [ ] 可動端でうなり・発熱があれば `min_pulse_us` / `max_pulse_us` を狭める（今回は不要だった）
 
 ## 4. Python版との比較（任意）
 
@@ -309,9 +310,13 @@ for v in [-1, -0.9, -0.8, -0.7]:
 
 ## 全部 ✅ になったら
 
-- [ ] README.md に `SoftwarePWM` / `PWMLED` / `RGBLED` / `Servo` を追記（確定仕様に昇格）
-- [ ] PLAN.md の 3c を ✅ に
-- [ ] CHANGELOG を確認してコミット
+2026-09-28 に完了したので、以下を実施済みです。
+
+- [x] README.md に `SoftwarePWM` / `PWMLED` / `RGBLED` / `Servo` を追記（確定仕様に昇格）
+- [x] PLAN.md の 3c を ✅ に
+- [x] CHANGELOG を確認してコミット
+
+4番（Python版との比較）は任意のまま残してあります。
 
 ## つまずいたら
 
