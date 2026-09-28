@@ -33,15 +33,19 @@ module Rgpio
     # @param blue       [Integer] GPIO line of the blue channel
     # @param frequency  [Numeric] Hz, for all three channels
     # @param active_low [Boolean] true for a common-anode LED
+    # @param balance    [Array<Float>] per-channel scale, 0.0..1.0 each, applied
+    #                   on top of every level asked for
     # @param pwm        [:software, :hardware, Hash] channel kind, or a
     #                   {red:, green:, blue:} hash of channels to borrow
     # @param chip       [Chip, nil] chip to share, or nil to open one
     # @param consumer   [String] name shown in the kernel's request list
     def initialize(red:, green:, blue:, frequency: PWMOutputDevice::DEFAULT_FREQUENCY,
-                   active_low: false, pwm: :software, chip: nil, consumer: "rgpio")
+                   active_low: false, balance: [1.0, 1.0, 1.0], pwm: :software, chip: nil, consumer: "rgpio")
       @owns_chip = chip.nil? && pwm == :software
       @chip = @owns_chip ? Chip.new : chip
       @closed = false
+      @balance = validate_triple(balance, "balance")
+      @color = [0.0, 0.0, 0.0]
       lines = { red: red, green: green, blue: blue }
       # One channel per colour: handing the same channel object to all three
       # would have them overwrite each other's duty cycle.
@@ -57,10 +61,10 @@ module Rgpio
     # @return [Hash{Symbol=>PWMLED}] the three channels, by colour
     attr_reader :channels
 
-    # @return [Array<Float>] the current colour as red, green, blue in 0.0..1.0
-    def color
-      @channels.values.map(&:value)
-    end
+    # The colour that was asked for, not the duty cycles it became — {#balance}
+    # and `active_low` both sit between the two.
+    # @return [Array<Float>] red, green, blue in 0.0..1.0
+    attr_reader :color
 
     # @param value [Array<Float>, Symbol] an r,g,b triple, or a name from {COLORS}
     def color=(value)
@@ -70,31 +74,42 @@ module Rgpio
                              "got #{value.inspect}"
       end
 
-      @channels.values.zip(triple).each { |channel, level| channel.value = level }
+      @color = validate_triple(triple, "color")
+      apply
+    end
+
+    # @return [Array<Float>] the per-channel scale in force
+    attr_reader :balance
+
+    # Re-scale the channels, keeping the colour that was asked for. Setting this
+    # while white is showing is how the calibration example works.
+    def balance=(triple)
+      @balance = validate_triple(triple, "balance")
+      apply
     end
 
     def red
-      @channels.fetch(:red).value
+      @color[0]
     end
 
     def green
-      @channels.fetch(:green).value
+      @color[1]
     end
 
     def blue
-      @channels.fetch(:blue).value
+      @color[2]
     end
 
     def red=(level)
-      @channels.fetch(:red).value = level
+      self.color = [level, green, blue]
     end
 
     def green=(level)
-      @channels.fetch(:green).value = level
+      self.color = [red, level, blue]
     end
 
     def blue=(level)
-      @channels.fetch(:blue).value = level
+      self.color = [red, green, level]
     end
 
     # Full brightness on all three channels, which is white.
@@ -106,14 +121,14 @@ module Rgpio
       self.color = :off
     end
 
-    # Invert every channel.
+    # Invert every channel, so a dimmed colour comes back as its complement.
     def toggle
-      @channels.each_value(&:toggle)
+      self.color = @color.map { |level| 1.0 - level }
     end
 
     # @return [Boolean] true when any channel is lit
     def on?
-      @channels.each_value.any?(&:on?)
+      @color.any?(&:positive?)
     end
 
     alias active? on?
@@ -133,6 +148,23 @@ module Rgpio
     end
 
     private
+
+    # Push the requested colour out through the balance. The channels hold the
+    # scaled levels; #color keeps reporting what was asked for.
+    def apply
+      @channels.values.each_with_index do |channel, i|
+        channel.value = @color[i] * @balance[i]
+      end
+    end
+
+    def validate_triple(triple, what)
+      unless triple.is_a?(Array) && triple.size == 3 &&
+             triple.all? { |v| v.is_a?(Numeric) && (0.0..1.0).cover?(v) }
+        raise ArgumentError, "#{what} must be three numbers in 0.0..1.0, got #{triple.inspect}"
+      end
+
+      triple.map(&:to_f)
+    end
 
     def named_color(name)
       COLORS.fetch(name) do

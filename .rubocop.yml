@@ -44,6 +44,10 @@ Metrics/PerceivedComplexity:
   Max: 12
 Metrics/ClassLength:
   Max: 220
+  # A test class is a list of cases; splitting one to fit a line count would
+  # scatter tests that belong together.
+  Exclude:
+    - "test/**/*"
 Metrics/ModuleLength:
   Max: 260
 

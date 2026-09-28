@@ -26,6 +26,9 @@ require_relative "../lib/rgpio"
 
 SERVO_GPIO = 4
 
+# Say what the device is doing as it happens, so the terminal and the bench agree.
+$stdout.sync = true
+
 servo = Rgpio::Servo.new(SERVO_GPIO, min_pulse_us: 1000, max_pulse_us: 2000)
 puts "Servo on GPIO#{SERVO_GPIO}, #{servo.pwm.frequency} Hz frames. Ctrl-C to stop."
 

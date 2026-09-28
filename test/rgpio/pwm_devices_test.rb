@@ -207,6 +207,47 @@ class PWMDevicesTest < Minitest::Test
     assert_raises(ArgumentError) { led.color = :octarine }
   end
 
+  def test_balance_scales_the_channels_without_changing_the_reported_colour
+    led = rgb(balance: [0.7, 1.0, 0.6])
+    led.color = :white
+
+    assert_equal [1.0, 1.0, 1.0], led.color, "the colour asked for is what is reported"
+    assert_in_delta 0.7, @channels[:red].duty_cycle
+    assert_in_delta 1.0, @channels[:green].duty_cycle
+    assert_in_delta 0.6, @channels[:blue].duty_cycle
+  end
+
+  def test_balance_can_be_retuned_while_a_colour_is_showing
+    led = rgb
+    led.color = :white
+    led.balance = [0.5, 1.0, 0.5]
+
+    assert_in_delta 0.5, @channels[:red].duty_cycle
+    assert_equal [1.0, 1.0, 1.0], led.color
+    assert_equal [0.5, 1.0, 0.5], led.balance
+  end
+
+  def test_balance_applies_to_a_partial_level_too
+    led = rgb(balance: [1.0, 1.0, 0.5])
+    led.blue = 0.4
+
+    assert_in_delta 0.2, @channels[:blue].duty_cycle
+    assert_in_delta 0.4, led.blue
+  end
+
+  def test_rejects_a_malformed_balance
+    assert_raises(ArgumentError) { rgb(balance: [1.0, 1.0]) }
+    assert_raises(ArgumentError) { rgb(balance: [1.0, 1.0, 1.5]) }
+  end
+
+  def test_toggle_inverts_the_requested_colour
+    led = rgb
+    led.color = [1.0, 0.25, 0.0]
+    led.toggle
+
+    assert_equal [0.0, 0.75, 1.0], led.color
+  end
+
   def test_closing_stops_every_channel
     led = rgb
     led.close

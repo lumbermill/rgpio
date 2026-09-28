@@ -218,6 +218,22 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   would be cheaper and is the obvious optimisation if it proves necessary; for
   LEDs the edge placement is invisible, so it has not been.
 
+**Phase 3c findings on real parts**
+
+- An RGB LED's white is tinted unless the channels are scaled. On the LED used
+  for verification (common cathode, 330 ohm on each channel, 3.3 V) white read as
+  bluish and `balance: [1.0, 0.8, 0.8]` corrected it — **red was the weak
+  channel**, despite carrying the most current: 1.3 V of headroom over its ~1.9 V
+  drop against 0.2-0.3 V over green's and blue's ~3.1 V, so roughly 3.9 mA against
+  0.9 mA. Modern InGaN green and blue dies are efficient enough per mA, and the
+  eye sensitive enough around 555 nm, to overturn a 4x current difference.
+- Doing that correction with resistors instead would mean raising green's and
+  blue's, and it is the worse tool: PWM removes time rather than current, so each
+  die keeps its rated current and therefore its efficiency and wavelength, while
+  running an InGaN die at a fraction of its current shifts the colour slightly.
+  The scale factor also travels with the code. `balance:` is per-part, so the gem
+  defaults to no correction and `examples/rgb_balance.rb` finds the value by eye.
+
 **Open questions**
 
 - The book's switch is wired to 3.3 V, so `Button` defaults to a pull-**down**
