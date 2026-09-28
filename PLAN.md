@@ -313,12 +313,14 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 
 ## Release / tooling readiness
 
-- [ ] Publish `0.1.0` to RubyGems (currently unpublished; `mfa_required` is set).
-      Gem metadata (`source_code_uri` / `changelog_uri` / `bug_tracker_uri`) and
-      packaged files (incl. CHANGELOG.md) are ready.
+- [ ] Publish `0.1.0` to RubyGems. `mfa_required` is set, so the push needs an
+      OTP from the maintainer. Everything else is ready and checked: the name is
+      free, the metadata URLs match the repository, and the built gem (70 KB, 43
+      files) installs into a clean GEM_HOME and works — all 18 public classes
+      present, a real I2C read through the installed copy.
 - [x] GitHub Actions CI running the logic-only test suite (no hardware needed) —
-      `.github/workflows/ci.yml`, Ruby 3.4, bundler-less (the committed lock is
-      pinned to the aarch64 dev box). A `RuboCop` lint job runs alongside.
+      `.github/workflows/ci.yml`, Ruby 3.3 / 3.4 / 4.0, bundler-less (the committed
+      lock is pinned to the aarch64 dev box). A `RuboCop` lint job runs alongside.
 - [x] RuboCop lint configuration — `.rubocop.yml` tuned to the project's style;
       the tree is clean. `rake` runs test + rubocop.
 - [ ] Integration tests for `LineRequest` / edge events (needs GPIO loopback
@@ -327,7 +329,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - [ ] Optional: RuboCop extensions (`rubocop-minitest`, `rubocop-rake`).
 - [x] `required_ruby_version` lowered to `>= 3.3` to match Trixie's default
       `ruby` (so `gem install rgpio` works on a stock Trixie box). Verified on
-      Ruby 3.3.8; CI now tests 3.3 and 3.4.
+      Ruby 3.3.8; CI tests 3.3, 3.4 and 4.0, and the dev box runs 4.0.4.
 
 ## Environment caveats (not yet pinned as spec)
 

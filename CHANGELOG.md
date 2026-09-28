@@ -7,13 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-First development release (targeting `0.1.0`). Not yet published to RubyGems.
+Nothing yet.
+
+## [0.1.0] - 2026-09-29
+
+First release. GPIO, PWM, I2C and SPI on a Raspberry Pi from Ruby, with a
+gpiozero-style device layer on top. Verified on Pi 5 and Pi 4 hardware; see
+[PLAN.md](PLAN.md) for what has been measured on what, and for the parts still
+waiting on hardware (Pi Zero / Pi 1, and `MotionSensor`).
 
 ### Added
 
 - **GPIO character-device I/O via libgpiod v2** (`Rgpio::Chip`, `Rgpio::LineRequest`)
-  bound through the stdlib `fiddle`, so it works on every Pi including ARMv6
-  boards (Pi Zero / Pi 1) where the precompiled `ffi` gem crashes.
+  bound through the stdlib `fiddle`. fiddle is built with the interpreter, so it
+  matches whatever architecture the Pi is, where the precompiled `ffi` gem
+  crashes on ARMv6 (Pi Zero / Pi 1) — those boards are not verified yet, but this
+  is the reason the binding is written this way.
 - `Rgpio::Chip.open` / `.new` with block form that closes the chip on exit.
 - Line requests with `direction`, `edge`, `bias`, `active_low`, `debounce_us`,
   `initial_value`, and `consumer` options.
@@ -81,19 +90,14 @@ First development release (targeting `0.1.0`). Not yet published to RubyGems.
   `examples/pwm_jitter.rb` measures the waveform a PWM channel really produces,
   using the kernel's edge timestamps and a jumper between two header pins.
 - `examples/led.rb`, `button.rb`, `motion_sensor.rb`, `motor.rb`: device-class
-  examples. The `Chip` / `LineRequest` versions of the LED and button demos moved
-  to `examples/lowlevel/`, so the top level shows the API most users want first.
+  examples, with `examples/lowlevel/` holding the same demos written straight
+  against `Chip` / `LineRequest` and `HardwarePWM`.
+- `Rgpio.available?` and `Rgpio.version` for probing the libgpiod library, and
+  `Rgpio.pause` as the counterpart to Python's `signal.pause()`.
+- Graceful handling of systems that ship libgpiod 1.x (e.g. Debian Bookworm,
+  where it is `libgpiod.so.2`): `require "rgpio"` probes for a libgpiod v2 symbol
+  and reports `Rgpio.available? == false` rather than raising, so the sysfs-only
+  `HardwarePWM` and the `ioctl`-only `I2C` and `SPI` stay usable there.
 
-### Changed
-
-- `require "rgpio"` no longer crashes on systems that ship libgpiod 1.x (e.g.
-  Debian Bookworm, where it is `libgpiod.so.2`): the loader now probes for a
-  libgpiod v2 symbol and reports `Rgpio.available? == false` instead of raising
-  when only v1 is present. The sysfs-only `HardwarePWM` stays usable there.
-- `Rgpio.available?` / `.version` helpers for probing the libgpiod library.
-- Examples: `examples/blink.rb`, `examples/button.rb`. The `HardwarePWM` servo
-  demo moved to `examples/lowlevel/servo.rb`, since the top-level `servo.rb` now
-  shows the `Servo` device class.
-- Minitest suite covering chip-selection logic and PWM helpers.
-
-[Unreleased]: https://github.com/lumbermill/rgpio/commits/main
+[Unreleased]: https://github.com/lumbermill/rgpio/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/lumbermill/rgpio/releases/tag/v0.1.0

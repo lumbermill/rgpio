@@ -956,6 +956,9 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 ## Project status
 
+`0.1.0` is the first release. It is `0.x` in earnest: everything documented here
+has been exercised on real hardware, but the API may still change before `1.0`.
+
 - **Released changes:** [CHANGELOG.md](CHANGELOG.md)
 - **Roadmap, planned APIs, and multi-board validation status:** [PLAN.md](PLAN.md)
 

@@ -12,7 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ["3.3", "3.4"]
+        # 3.3 is the floor (required_ruby_version, and Trixie's default apt ruby);
+        # 4.0 is what the maintainer develops on.
+        ruby: ["3.3", "3.4", "4.0"]
 
     steps:
       - uses: actions/checkout@v5
