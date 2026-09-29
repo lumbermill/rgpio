@@ -1,0 +1,76 @@
+PATH
+  remote: .
+  specs:
+    rgpio (0.1.0)
+      fiddle (>= 1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ast (2.4.3)
+    fiddle (1.1.8)
+    json (2.18.0)
+    language_server-protocol (3.17.0.6)
+    lint_roller (1.1.0)
+    minitest (6.0.0)
+      prism (~> 1.5)
+    parallel (2.1.0)
+    parser (3.3.12.0)
+      ast (~> 2.4.1)
+      racc
+    prism (1.8.1)
+    racc (1.8.1)
+    rainbow (3.1.1)
+    rake (13.3.1)
+    regexp_parser (2.12.0)
+    rubocop (1.90.0)
+      json (>= 2.3)
+      language_server-protocol (~> 3.17.0.2)
+      lint_roller (~> 1.1.0)
+      parallel (>= 1.10)
+      parser (>= 3.3.0.2)
+      rainbow (>= 2.2.2, < 4.0)
+      regexp_parser (>= 2.9.3, < 3.0)
+      rubocop-ast (>= 1.49.0, < 2.0)
+      ruby-progressbar (~> 1.7)
+      unicode-display_width (>= 2.4.0, < 4.0)
+    rubocop-ast (1.50.0)
+      parser (>= 3.3.7.2)
+      prism (~> 1.7)
+    ruby-progressbar (1.13.0)
+    unicode-display_width (3.2.0)
+      unicode-emoji (~> 4.1)
+    unicode-emoji (4.2.0)
+
+PLATFORMS
+  aarch64-linux-gnu
+
+DEPENDENCIES
+  minitest
+  rake
+  rgpio!
+  rubocop (~> 1.90)
+
+CHECKSUMS
+  ast (2.4.3)
+  fiddle (1.1.8) sha256=7fa8ee3627271497f3add5503acdbc3f40b32f610fc1cf49634f083ef3f32eee
+  json (2.18.0)
+  language_server-protocol (3.17.0.6)
+  lint_roller (1.1.0)
+  minitest (6.0.0) sha256=4ca597fc1d735ea18d2b4b98c5fb1d5a6da4a6f35ddf32bd5fa3eded33a453be
+  parallel (2.1.0)
+  parser (3.3.12.0)
+  prism (1.8.1) sha256=b260c1844ee0c7ead9c938f7fd63b95888c87cc054dfb64043204eccff8116ac
+  racc (1.8.1)
+  rainbow (3.1.1)
+  rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
+  regexp_parser (2.12.0)
+  rgpio (0.1.0)
+  rubocop (1.90.0)
+  rubocop-ast (1.50.0)
+  ruby-progressbar (1.13.0)
+  unicode-display_width (3.2.0)
+  unicode-emoji (4.2.0)
+
+BUNDLED WITH
+  4.0.10

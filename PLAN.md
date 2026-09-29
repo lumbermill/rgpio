@@ -313,11 +313,16 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 
 ## Release / tooling readiness
 
-- [ ] Publish `0.1.0` to RubyGems. `mfa_required` is set, so the push needs an
-      OTP from the maintainer. Everything else is ready and checked: the name is
-      free, the metadata URLs match the repository, and the built gem (70 KB, 43
-      files) installs into a clean GEM_HOME and works — all 18 public classes
-      present, a real I2C read through the installed copy.
+`0.1.0` is out. What follows is the state of everything around it.
+
+- [x] **`0.1.0` published to RubyGems on 2026-09-29** (00:23 UTC), tagged
+      `v0.1.0` at `db6d1ca`. Confirmed after the fact: `gem install rgpio` from
+      RubyGems into a clean `GEM_HOME` works on the dev Pi 5 (libgpiod 2.2.1
+      detected, every public class present), and the metadata URLs
+      (`changelog_uri` / `source_code_uri` / `bug_tracker_uri`) all resolve. The
+      push needed an OTP, since `rubygems_mfa_required` is set. No GitHub Release
+      was created — the tag and the CHANGELOG carry the same information, and the
+      Releases page can be filled in later if it is ever wanted.
 - [x] GitHub Actions CI running the logic-only test suite (no hardware needed) —
       `.github/workflows/ci.yml`, Ruby 3.3 / 3.4 / 4.0, bundler-less (the committed
       lock is pinned to the aarch64 dev box). A `RuboCop` lint job runs alongside.
