@@ -16,7 +16,7 @@ module Rgpio
   # {#write} and {#read} are that same transfer with one direction ignored.
   #
   # The header bus is SPI0 (GPIO10 = MOSI, GPIO9 = MISO, GPIO11 = SCLK, GPIO8 =
-  # CE0, GPIO7 = CE1), and only appears once it is enabled — see README for the
+  # CE0, GPIO7 = CE1), and only appears once it is enabled — see docs/guide.md for the
   # dtparam line.
   class SPI
     # ioctl numbers from <linux/spi/spidev.h>. They are built here rather than

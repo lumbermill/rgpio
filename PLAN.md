@@ -2,7 +2,8 @@
 
 This document tracks **unconfirmed plans, in-progress work, and caveats** that
 are not yet settled specification. Anything documented in [README.md](README.md)
-is considered confirmed and supported; anything here is subject to change.
+or [docs/guide.md](docs/guide.md) is considered confirmed and supported;
+anything here is subject to change.
 
 ## Roadmap
 
@@ -130,11 +131,11 @@ is published:
 - ~~**Pi 4 hardware-PWM mapping**~~ — board-aware `HardwarePWM`: `detect_board`
   reads `/proc/device-tree/model`; `.new(gpio:, board:)` selects the channel per
   board (Pi 4: `GPIO12/18 → 0`, `GPIO13/19 → 1`; chip at `fe20c000`, `npwm == 2`).
-  Verified on a real Pi 4 (2026-08-27). Now confirmed spec — see README.
+  Verified on a real Pi 4 (2026-08-27). Now confirmed spec — see the guide.
 - ~~**Batch multi-line I/O**~~ — `LineRequest#get_values` / `#set_values` via
   `gpiod_line_request_get_values_subset` / `set_values_subset`. Verified on Pi 5
   hardware (atomic reads/writes and subset addressing). Now confirmed spec — see
-  README.
+  docs/guide.md.
 - ~~**Graceful libgpiod v1 handling**~~ — `require "rgpio"` used to crash when
   only libgpiod 1.x was present (e.g. Bookworm's `libgpiod.so.2`). The loader now
   probes for a v2 symbol and reports `Rgpio.available? == false` instead. Found
@@ -179,13 +180,13 @@ Python filenames, so they stand on their own for anyone reading the gem.
 
 | Stage | Scope | Book sections | Status |
 |---|---|---|---|
-| 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
+| 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | 🟡 written + unit-tested, hardware verification pending |
 | 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 written + unit-tested, hardware verification pending |
-| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
-| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see README |
+| 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
+| 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
 
 I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
@@ -305,7 +306,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   there); the shaft switch is left to `Button`. Still to check on hardware with
   a KY-040: no missed steps turning slowly or fast, the direction convention
   (A before B = clockwise), the bound/`wrap:` ends, and whether `debounce_us`
-  of ~1 ms is needed at all. Stays out of the README until then.
+  of ~1 ms is needed at all. Stays out of the guide until then.
 - `ILI9341` / `XPT2046` (3f) are for a possible section on the 2.8" SPI TFT
   with touch, as the graphic step after `ST7032`. Decisions taken:
   - **User-space SPI, not a kernel driver.** `dtoverlay=mipi-dbi-spi` / fbtft
@@ -348,7 +349,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - `Motor` has no speed control (it would need PWM on both lines); the book's
   sample only uses full-speed forward/backward.
 - `MotionSensor` is **deferred**: the PIR modules on hand are an unreliable
-  supply, so it is out of the 3a verification scope and stays out of the README
+  supply, so it is out of the 3a verification scope and stays out of the guide
   until a module can be tested end to end. The class, its unit tests and
   `examples/motion_sensor.rb` ship as they are. What testing did show:
   it reports every pulse the module emits, and the D-SUN (BISS0001)
@@ -393,7 +394,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 ## Environment caveats (not yet pinned as spec)
 
 - **PWM overlay parameters vary by kernel version.** The `dtoverlay` `pin`/`func`
-  values in the README are correct for current Trixie kernels; if they change,
+  values in the guide are correct for current Trixie kernels; if they change,
   the definitive list is in `/boot/firmware/overlays/README` on the Pi.
 - **PWM sysfs chip number varies by kernel version.** On Pi 5 the RP1 header PWM
   is typically `pwmchip2`, but this is auto-detected rather than assumed. (On the

@@ -8,7 +8,7 @@ module Rgpio
   # -----------------------------
   # The RP1 PWM peripheral must be enabled via dtoverlay in
   # /boot/firmware/config.txt before the chip appears in sysfs.
-  # See README.md for the required overlay configuration.
+  # See docs/guide.md for the required overlay configuration.
   #
   # GPIO-to-PWM mapping on Pi 5 (RP1):
   #   GPIO12 → RP1 PWM chip, channel 0
@@ -251,7 +251,7 @@ module Rgpio
       chips = self.class.available_chips
       if chips.empty?
         raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
-                        "Is the dtoverlay configured? See README.md."
+                        "Is the dtoverlay configured? See docs/guide.md."
       end
 
       profile = PWM_CHIP_PROFILE[@board]
@@ -273,7 +273,7 @@ module Rgpio
       chip_list = chips.map { |c| "pwmchip#{c[:chip]}(npwm=#{c[:npwm]})" }.join(", ")
       raise PWMError,
             "Cannot auto-detect the header PWM chip for board #{@board.inspect}. " \
-            "Available: #{chip_list}. Pass chip: <number> explicitly (see README.md)."
+            "Available: #{chip_list}. Pass chip: <number> explicitly (see docs/guide.md)."
     end
 
     def export_channel

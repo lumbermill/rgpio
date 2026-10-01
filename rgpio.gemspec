@@ -19,9 +19,11 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.3"
 
-  # PLAN.md ships too: the README points at it for the roadmap and for what has
-  # been verified on which board.
-  spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "LICENSE", "README.md", "CHANGELOG.md", "PLAN.md"]
+  # The guide and PLAN.md ship too: the README points at the guide for the full
+  # manual, and at PLAN.md for the roadmap and what has been verified on which
+  # board.
+  spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "LICENSE", "README.md", "CHANGELOG.md", "PLAN.md",
+                   "docs/**/*.md"]
 
   # `fiddle` is a default gem on Ruby <= 3.4 and a bundled gem from 3.5 on;
   # declaring it keeps the dependency satisfied either way. Unlike the

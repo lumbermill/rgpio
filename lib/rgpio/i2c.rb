@@ -17,7 +17,7 @@ module Rgpio
   #   i2c.close
   #
   # The I2C bus on the 40-pin header (GPIO2 = SDA, GPIO3 = SCL) is bus 1, and
-  # only appears once it is enabled — see README for the dtparam line.
+  # only appears once it is enabled — see docs/guide.md for the dtparam line.
   class I2C
     # ioctl numbers from <linux/i2c-dev.h>.
     I2C_SLAVE = 0x0703
