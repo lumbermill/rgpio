@@ -19,6 +19,10 @@ require_relative "rgpio/devices/servo"
 require_relative "rgpio/devices/adt7410"
 require_relative "rgpio/devices/st7032"
 require_relative "rgpio/devices/mcp3208"
+require_relative "rgpio/devices/rgb565"
+require_relative "rgpio/devices/font5x7"
+require_relative "rgpio/devices/ili9341"
+require_relative "rgpio/devices/xpt2046"
 
 # Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
 # the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.

@@ -114,6 +114,7 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
 - `RotaryEncoder` — written + unit-tested, not yet on hardware; see Phase 3 below.
+- `ILI9341` / `XPT2046` — written + unit-tested, not yet on hardware; see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
 
@@ -181,6 +182,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | 🟡 written + unit-tested, hardware verification pending |
+| 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 written + unit-tested, hardware verification pending |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see README |
@@ -304,6 +306,43 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   a KY-040: no missed steps turning slowly or fast, the direction convention
   (A before B = clockwise), the bound/`wrap:` ends, and whether `debounce_us`
   of ~1 ms is needed at all. Stays out of the README until then.
+- `ILI9341` / `XPT2046` (3f) are for a possible section on the 2.8" SPI TFT
+  with touch, as the graphic step after `ST7032`. Decisions taken:
+  - **User-space SPI, not a kernel driver.** `dtoverlay=mipi-dbi-spi` / fbtft
+    would make it a framebuffer or DRM device — a desktop target, but a
+    different way in from Ruby and a config.txt edit for readers. rgpio drives
+    it over spidev with D/C and RESET as GPIO outputs.
+  - **`SPI#send_bytes`** (new) sends any length tx-only, in messages of
+    `SPI.max_transfer_size` (spidev's `bufsiz`, 4096 by default), reusing one
+    buffer and unpacking nothing back. A full frame is 153,600 bytes, so ~38
+    ioctls. Chip select drops between messages; the ILI9341 keeps writing RAM
+    across that because the stream is keyed on RAMWR + D/C, not CS.
+  - **Per-transfer clock.** spidev takes the speed in every message, so the
+    display at 32 MHz on CE0 and the touch at 2 MHz on CE1 are simply two
+    `SPI` objects; no switching is needed.
+  - **Drawing is locked** (a Monitor), so a touch callback on the watcher thread
+    can draw while the main thread does. Colours went to `Rgpio::RGB565` and
+    text to `Font5x7::Drawing` (classic 5x7 ASCII font; anything else draws as a
+    box), both reusable by another colour display. Opaque text renders a line to
+    one buffer and blits it; transparent text is one rect per horizontal run.
+  - **Touch:** median of 5 conversions, first one dropped; pressure is
+    `z1 + 4095 - z2` against `threshold` (300). T_IRQ is optional: with it the
+    watcher sleeps on a falling edge, without it it polls every 20 ms. While a
+    touch is held the watcher polls for the release, then discards the edges
+    the conversions themselves caused on PENIRQ. `when_touched` fires once per
+    touch — a drawing app polls `#position` instead (see
+    `examples/touch_paint.rb`); a `when_moved` can be added if a book sample
+    wants it. Calibration is a 6-number affine map fitted by least squares from
+    ≥3 touches (`XPT2046.calibration_from`), so swapped or mirrored axes need
+    no flags; uncalibrated `#position` is the raw x/y.
+  - Not done: reading from the display (SDO is left unconnected — on some boards
+    it holds MISO and corrupts touch reads), hardware scrolling, images from
+    files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
+  - To check on hardware (Pi 5 / Trixie and Pi 4): the init sequence and
+    MADCTL/BGR on the actual module, `invert=` needed or not, the four
+    rotations, full-screen `fill` time (theory ~40 ms at 32 MHz) and whether
+    32 MHz is stable on jumper wires, PWM backlight, the touch threshold and
+    calibration, and that touches are not lost while the screen is drawing.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's

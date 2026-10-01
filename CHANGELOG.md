@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `when_rotated` / `when_rotated_clockwise` / `when_rotated_counter_clockwise`
   callbacks, with `examples/rotary_encoder.rb`. Unit-tested; not yet verified
   on hardware.
+- `Rgpio::ILI9341` for 240x320 SPI colour TFTs: `fill` / `fill_rect` /
+  `pixel`, `blit` of raw RGB565, `text` in a built-in 5x7 font with `scale:`
+  and optional background, `rotation=`, `invert=`, and an on/off or PWM
+  `backlight=`. Drawing is clipped to the screen and safe from several threads.
+  With `examples/tft.rb`. Unit-tested; not yet verified on hardware.
+- `Rgpio::XPT2046` for the resistive touch panel on the same modules: `raw`,
+  `touched?`, `position`, `when_touched` / `when_released` (T_IRQ optional),
+  and `XPT2046.calibration_from` to fit screen coordinates from a few touches.
+  With `examples/touch_paint.rb`. Unit-tested; not yet verified on hardware.
+- `Rgpio::RGB565` (colour names, `[r, g, b]` and RGB565 integers) and
+  `Rgpio::Font5x7`, shared by the display classes.
+- `SPI#send_bytes` sends a block of any length tx-only, split at
+  `SPI.max_transfer_size` (spidev's `bufsiz`), without unpacking a reply.
 
 ## [0.1.0] - 2026-09-29
 

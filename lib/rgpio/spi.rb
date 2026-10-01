@@ -39,6 +39,22 @@ module Rgpio
     # Clock polarity and phase, as the kernel numbers them.
     MODE_RANGE = (0..3)
 
+    # Where spidev publishes the most it accepts in one message, and what that
+    # is when the parameter cannot be read.
+    BUFSIZ_PATH = "/sys/module/spidev/parameters/bufsiz".freeze
+    DEFAULT_BUFSIZ = 4096
+
+    # @return [Integer] the largest message spidev accepts, in bytes. A module
+    #   parameter (spidev.bufsiz=), so it is the same for every bus.
+    def self.max_transfer_size
+      @max_transfer_size ||= begin
+        size = File.read(BUFSIZ_PATH).to_i
+        size.positive? ? size : DEFAULT_BUFSIZ
+      rescue SystemCallError
+        DEFAULT_BUFSIZ
+      end
+    end
+
     # @return [Integer] the ioctl request for a message of `count` transfers
     def self.message_ioctl(count)
       ioctl_number(IOC_WRITE, 0, TRANSFER_SIZE * count)
@@ -176,6 +192,28 @@ module Rgpio
     # @return [Integer] number of bytes sent
     def write(*bytes)
       transfer(bytes).size
+    end
+
+    # Send a block of any length, ignoring what comes back — for a display's
+    # pixel data, where a frame is many times what spidev takes in one message.
+    # The block goes out in messages of at most {.max_transfer_size} bytes, so
+    # chip select is released between them; a controller that keys on chip
+    # select rather than on a command (the ILI9341 does not) needs #transfer.
+    # Nothing is unpacked on the way back, which keeps a frame cheap.
+    # @param data [String] bytes to send
+    # @return [Integer] number of bytes sent
+    def send_bytes(data)
+      data = data.b
+      chunk = self.class.max_transfer_size
+      @tx_buffer ||= Fiddle::Pointer.malloc(chunk, Fiddle::RUBY_FREE)
+      (0...data.bytesize).step(chunk) do |offset|
+        part = data.byteslice(offset, chunk)
+        @tx_buffer[0, part.bytesize] = part
+        message = self.class.pack_transfer(@tx_buffer.to_i, 0, part.bytesize, @speed_hz,
+                                           bits_per_word: @bits_per_word)
+        @io.ioctl(self.class.message_ioctl(1), message)
+      end
+      data.bytesize
     end
 
     # Clock in `count` bytes, sending zeros.

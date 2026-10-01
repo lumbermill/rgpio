@@ -21,9 +21,11 @@ Style/StringLiteralsInInterpolation:
 Naming/AccessorMethodName:
   Enabled: false
 
-# Allow domain abbreviations such as `hz` and `us`.
+# Allow domain abbreviations such as `hz` and `us`, screen coordinates and
+# sizes (`x`, `y`, `w`, `h`), and an encoder's phase names (`a`, `b`).
 Naming/MethodParameterName:
   MinNameLength: 2
+  AllowedNames: [as, at, by, cc, db, id, if, in, io, ip, of, on, os, pp, to, hz, us, x, y, w, h, a, b]
 
 # Hardware identifiers (bcm2711, rp1, uint32, int32) are not "numbered vars".
 Naming/VariableNumber:

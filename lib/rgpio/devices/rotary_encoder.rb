@@ -46,8 +46,7 @@ module Rgpio
     # @param debounce_us [Integer] kernel debounce window in microseconds
     # @param chip        [Chip, nil] chip to share, or nil to open one
     # @param consumer    [String] name shown in the kernel's request list
-    # a: / b: are the phase names on encoder datasheets and in gpiozero.
-    def initialize(a:, b:, max_steps: 16, wrap: false, pull_up: true, debounce_us: 0, chip: nil, consumer: "rgpio") # rubocop:disable Naming/MethodParameterName
+    def initialize(a:, b:, max_steps: 16, wrap: false, pull_up: true, debounce_us: 0, chip: nil, consumer: "rgpio")
       unless max_steps.is_a?(Integer) && max_steps >= 0
         raise ArgumentError, "max_steps must be a non-negative Integer, got #{max_steps.inspect}"
       end
