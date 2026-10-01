@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `Rgpio::RotaryEncoder` for quadrature encoders such as the KY-040:
+  `steps` / `steps=` / `value`, `max_steps:` with optional `wrap:`, and
+  `when_rotated` / `when_rotated_clockwise` / `when_rotated_counter_clockwise`
+  callbacks, with `examples/rotary_encoder.rb`. Unit-tested; not yet verified
+  on hardware.
 
 ## [0.1.0] - 2026-09-29
 

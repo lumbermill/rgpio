@@ -113,6 +113,7 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
   unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
+- `RotaryEncoder` — written + unit-tested, not yet on hardware; see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
 
@@ -179,6 +180,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 |---|---|---|---|
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
+| 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | 🟡 written + unit-tested, hardware verification pending |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see README |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see README |
@@ -289,6 +291,19 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 - The book's switch is wired to 3.3 V, so `Button` defaults to a pull-**down**
   bias, unlike gpiozero's pull-up default. That wiring is confirmed on hardware;
   what is left is to cross-check the book's circuit diagram before it is revised.
+- `RotaryEncoder` is for a new 実践課題3 section (turning a knob to drive a
+  servo or the full-colour LED's brightness). Both phases share one request and
+  one watcher thread, so their edges arrive in kernel order; the phase state is
+  rebuilt from each edge's type rather than re-read, and a step is counted when
+  the phases return to rest after a net four Gray-code transitions (one detent,
+  as gpiozero counts). Bounce cancels itself out. The watcher starts in the
+  constructor, not on the first callback, so `steps` counts without one.
+  Callbacks fire on every detent, including at a `max_steps` bound where
+  `steps` does not move. No kernel debounce by default (`debounce_us:` is
+  there); the shaft switch is left to `Button`. Still to check on hardware with
+  a KY-040: no missed steps turning slowly or fast, the direction convention
+  (A before B = clockwise), the bound/`wrap:` ends, and whether `debounce_us`
+  of ~1 ms is needed at all. Stays out of the README until then.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's

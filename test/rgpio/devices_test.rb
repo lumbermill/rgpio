@@ -9,14 +9,18 @@ class DevicesTest < Minitest::Test
   class FakeChip
     attr_reader :requests, :closed
 
+    # Line levels a new request reads back before anything is written.
+    attr_accessor :initial_values
+
     def initialize
       @requests = []
       @closed = false
+      @initial_values = {}
     end
 
     def request_lines(**options)
       @requests << options
-      FakeRequest.new(options.fetch(:offsets))
+      FakeRequest.new(options.fetch(:offsets), @initial_values)
     end
 
     def close
@@ -30,10 +34,10 @@ class DevicesTest < Minitest::Test
     # Edge events handed to the watcher thread, one batch per read.
     attr_accessor :event_batches
 
-    def initialize(offsets)
+    def initialize(offsets, values = {})
       @offsets = offsets
       @writes = []
-      @values = {}
+      @values = values.dup
       @released = false
       @event_batches = []
     end
@@ -242,6 +246,120 @@ class DevicesTest < Minitest::Test
     assert_equal [2, :inactive], request_for(forward).writes.last
   end
 
+  # --- RotaryEncoder ----------------------------------------------------- #
+
+  # Phase states as [A, B] levels for one detent, starting from rest (both high).
+  CLOCKWISE = [[0, 1], [0, 0], [1, 0], [1, 1]].freeze
+  COUNTER_CLOCKWISE = [[1, 0], [0, 0], [0, 1], [1, 1]].freeze
+
+  def test_encoder_requests_both_phases_in_one_request
+    Rgpio::RotaryEncoder.new(a: 17, b: 18, chip: @chip).close
+    options = @chip.requests.first
+
+    assert_equal 1, @chip.requests.size
+    assert_equal [17, 18], options[:offsets]
+    assert_equal :both, options[:edge]
+    assert_equal :pull_up, options[:bias]
+    assert_equal 0, options[:debounce_us]
+  end
+
+  def test_encoder_counts_a_clockwise_detent_and_fires_callbacks
+    encoder = new_encoder
+    request_for(encoder).event_batches = [events_for(CLOCKWISE)]
+
+    seen = Queue.new
+    encoder.when_rotated_clockwise         { seen << [:cw, encoder.steps] }
+    encoder.when_rotated_counter_clockwise { seen << [:ccw, encoder.steps] }
+    encoder.when_rotated                   { seen << [:rotated, encoder.steps] }
+
+    assert_equal [:cw, 1], seen.pop
+    assert_equal [:rotated, 1], seen.pop
+    encoder.close
+  end
+
+  def test_encoder_counts_counter_clockwise_detents
+    encoder = with_encoder { |e| turn(e, COUNTER_CLOCKWISE * 2) }
+
+    assert_equal(-2, encoder.steps)
+  end
+
+  def test_encoder_ignores_bounce_within_a_detent
+    bouncy = [[0, 1], [1, 1], [0, 1], [0, 0], [1, 0], [0, 0], [1, 0], [1, 1]]
+    encoder = with_encoder { |e| turn(e, bouncy) }
+
+    assert_equal 1, encoder.steps
+  end
+
+  def test_encoder_drops_a_half_turn_and_back
+    encoder = with_encoder { |e| turn(e, [[0, 1], [0, 0], [0, 1], [1, 1]]) }
+
+    assert_equal 0, encoder.steps
+  end
+
+  def test_encoder_ignores_a_repeated_edge
+    repeated = [[0, 1], [0, 1], [0, 0], [1, 0], [1, 1]]
+    encoder = with_encoder { |e| turn(e, repeated) }
+
+    assert_equal 1, encoder.steps
+  end
+
+  def test_encoder_stops_at_max_steps_but_still_fires
+    calls = 0
+    encoder = with_encoder(max_steps: 2) do |e|
+      e.when_rotated { calls += 1 }
+      turn(e, CLOCKWISE * 3)
+    end
+
+    assert_equal 2, encoder.steps
+    assert_in_delta 1.0, encoder.value
+    assert_equal 3, calls
+  end
+
+  def test_encoder_wraps_to_the_other_end
+    encoder = with_encoder(max_steps: 2, wrap: true) { |e| turn(e, CLOCKWISE * 3) }
+
+    assert_equal(-2, encoder.steps)
+  end
+
+  def test_encoder_steps_setter_is_bounded
+    encoder = with_encoder(max_steps: 4)
+    encoder.steps = 10
+
+    assert_equal 4, encoder.steps
+    encoder.steps = -2
+
+    assert_in_delta(-0.5, encoder.value)
+  end
+
+  def test_encoder_without_max_steps_is_unbounded
+    encoder = with_encoder(max_steps: 0) { |e| turn(e, CLOCKWISE * 20) }
+
+    assert_equal 20, encoder.steps
+    assert_in_delta 0.0, encoder.value
+  end
+
+  def test_encoder_with_pull_down_rests_with_both_phases_low
+    @chip.initial_values = {}
+    encoder = Rgpio::RotaryEncoder.new(a: 17, b: 18, pull_up: false, chip: @chip)
+    turn(encoder, [[1, 0], [1, 1], [0, 1], [0, 0]])
+    encoder.close
+
+    assert_equal :pull_down, @chip.requests.first[:bias]
+    assert_equal 1, encoder.steps
+  end
+
+  def test_encoder_rejects_a_negative_max_steps
+    assert_raises(ArgumentError) { Rgpio::RotaryEncoder.new(a: 17, b: 18, max_steps: -1, chip: @chip) }
+    assert_empty @chip.requests
+  end
+
+  def test_encoder_close_releases_the_request
+    encoder = new_encoder
+    encoder.close
+
+    assert_predicate request_for(encoder), :released
+  end
+
   # --- Rgpio.pause ------------------------------------------------------- #
 
   def test_pause_returns_when_interrupted
@@ -258,5 +376,36 @@ class DevicesTest < Minitest::Test
 
   def request_for(device)
     device.instance_variable_get(:@request)
+  end
+
+  # An encoder resting with both phases high, as a KY-040 does.
+  def new_encoder(**)
+    @chip.initial_values = { 17 => :active, 18 => :active }
+    Rgpio::RotaryEncoder.new(a: 17, b: 18, chip: @chip, **)
+  end
+
+  # Build an encoder, run the block against it, and close it.
+  def with_encoder(**)
+    encoder = new_encoder(**)
+    yield encoder if block_given?
+    encoder
+  ensure
+    encoder&.close
+  end
+
+  # Edge events that move the phases from rest (both high) through +states+.
+  def events_for(states, from: [1, 1])
+    states.each_with_index.map do |state, i|
+      previous = i.zero? ? from : states[i - 1]
+      line = state[0] == previous[0] && state != previous ? 1 : 0
+      { offset: [17, 18][line], type: state[line] == 1 ? :rising : :falling, timestamp_ns: i }
+    end
+  end
+
+  # Feed edges straight to the decoder, bypassing the watcher thread so the
+  # count can be checked without waiting on it.
+  def turn(encoder, states)
+    from = encoder.instance_variable_get(:@state)
+    events_for(states, from: [from >> 1, from & 1]).each { |event| encoder.send(:handle, event) }
   end
 end
