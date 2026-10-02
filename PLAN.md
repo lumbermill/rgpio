@@ -321,7 +321,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     ioctls. Chip select drops between messages; the ILI9341 keeps writing RAM
     across that because the stream is keyed on RAMWR + D/C, not CS.
   - **Per-transfer clock.** spidev takes the speed in every message, so the
-    display at 32 MHz on CE0 and the touch at 2 MHz on CE1 are simply two
+    display at 24 MHz on CE0 and the touch at 2 MHz on CE1 are simply two
     `SPI` objects; no switching is needed.
   - **Drawing is locked** (a Monitor), so a touch callback on the watcher thread
     can draw while the main thread does. Colours went to `Rgpio::RGB565` and
@@ -343,9 +343,16 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
   - To check on hardware (Pi 5 / Trixie and Pi 4): the init sequence and
     MADCTL/BGR on the actual module, `invert=` needed or not, the four
-    rotations, full-screen `fill` time (theory ~40 ms at 32 MHz) and whether
-    32 MHz is stable on jumper wires, PWM backlight, the touch threshold and
+    rotations, full-screen `fill` time, PWM backlight, the touch threshold and
     calibration, and that touches are not lost while the screen is drawing.
+  - **Clock, Pi 5 (ILITEK ILI9341 on jumper wires):** the default was 32 MHz
+    and `examples/tft.rb` failed every run — the first red fill showed, then
+    the panel went whitish and ignored the rest. 8, 16 and 24 MHz ran it
+    cleanly. RP1's SPI takes 200 MHz divided by an even number, so 32 MHz is
+    really 25 MHz (fill measured 52 ms, theory 49 ms) and 24 MHz is 20 MHz.
+    Odd detail: a separate script doing several fills at 32 MHz passed, so the
+    failure looks pattern-dependent (signal integrity) rather than a protocol
+    bug. Default lowered to 24 MHz (20 MHz real).
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's

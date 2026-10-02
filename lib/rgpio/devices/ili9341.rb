@@ -28,7 +28,10 @@ module Rgpio
     NATIVE_WIDTH = 240
     NATIVE_HEIGHT = 320
 
-    DEFAULT_SPEED_HZ = 32_000_000
+    # The Pi 5's SPI divides a 200 MHz clock by an even number, so this runs at
+    # 20 MHz (32 MHz would be 25 MHz, which garbled full-screen fills on jumper
+    # wires). Pi 4 dividers differ; pass speed_hz: to go faster on short wires.
+    DEFAULT_SPEED_HZ = 24_000_000
 
     # Command set (datasheet section 8).
     CMD_SWRESET = 0x01
