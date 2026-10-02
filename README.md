@@ -90,14 +90,13 @@ If it fails with `Errno::EACCES`, add yourself to the `gpio` group
 | Raw GPIO | `Chip`, `LineRequest` | [GPIO Usage](docs/guide.md#gpio-usage) |
 | Hardware PWM | `HardwarePWM` | [Hardware PWM Usage](docs/guide.md#hardware-pwm-usage) |
 | I2C | `I2C`, `ADT7410`, `ST7032` | [I2C Usage](docs/guide.md#i2c-usage) |
-| SPI | `SPI`, `MCP3208` | [SPI Usage](docs/guide.md#spi-usage) |
+| SPI | `SPI`, `MCP3208`, `ILI9341` (colour TFT), `XPT2046` (touch) | [SPI Usage](docs/guide.md#spi-usage) |
 
 Every class is documented in full in **[docs/guide.md](docs/guide.md)**, with
 wiring notes, the [API reference](docs/guide.md#api-reference) and
 [how to run the examples](docs/guide.md#running-the-examples) in
 [`examples/`](examples). Devices written but still waiting on hardware
-verification (such as `MotionSensor` and the `ILI9341` TFT)
-are listed in [PLAN.md](PLAN.md).
+verification (such as `MotionSensor`) are listed in [PLAN.md](PLAN.md).
 
 ## Project status
 

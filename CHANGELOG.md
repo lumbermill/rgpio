@@ -18,11 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pixel`, `blit` of raw RGB565, `text` in a built-in 5x7 font with `scale:`
   and optional background, `rotation=`, `invert=`, and an on/off or PWM
   `backlight=`. Drawing is clipped to the screen and safe from several threads.
-  With `examples/tft.rb`. Unit-tested; not yet verified on hardware.
+  The SPI clock defaults to 24 MHz (20 MHz on a Pi 5; a full-screen fill takes
+  about 65 ms). With `examples/tft.rb`. Verified on Pi 5.
 - `Rgpio::XPT2046` for the resistive touch panel on the same modules: `raw`,
   `touched?`, `position`, `when_touched` / `when_released` (T_IRQ optional),
   and `XPT2046.calibration_from` to fit screen coordinates from a few touches.
-  With `examples/touch_paint.rb`. Unit-tested; not yet verified on hardware.
+  A reading taken while the pen lands or lifts is discarded. With
+  `examples/touch_paint.rb`. Verified on Pi 5.
 - `Rgpio::RGB565` (colour names, `[r, g, b]` and RGB565 integers) and
   `Rgpio::Font5x7`, shared by the display classes.
 - `SPI#send_bytes` sends a block of any length tx-only, split at

@@ -11,7 +11,7 @@ anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d verified on Pi 5 (`MotionSensor` deferred); 3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d and 3f verified on Pi 5 (`MotionSensor` deferred); 3e pending |
 
 ## Multi-board support — validation status
 
@@ -114,7 +114,6 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
   unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
-- `ILI9341` / `XPT2046` — written + unit-tested, not yet on hardware; see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
 
@@ -182,7 +181,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
-| 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 verified on Pi 5, Pi 4 pending |
+| 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see the guide |
@@ -341,8 +340,8 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   - Not done: reading from the display (SDO is left unconnected — on some boards
     it holds MISO and corrupts touch reads), hardware scrolling, images from
     files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
-  - To check on hardware: everything above again on the Pi 4 (different SPI
-    clock dividers, so the 24 MHz default needs its own check there).
+  - Still to check: the Pi 4 (different SPI clock dividers, so the 24 MHz
+    default needs its own check there) and a 2.4" module.
   - **Clock, Pi 5 (ILITEK ILI9341 on jumper wires):** the default was 32 MHz
     and `examples/tft.rb` failed every run — the first red fill showed, then
     the panel went whitish and ignored the rest. 8, 16 and 24 MHz ran it

@@ -7,7 +7,7 @@ module Rgpio
   #   lcd = Rgpio::ILI9341.new(dc: 24, reset: 25, backlight: 18)
   #   lcd.fill(:black)
   #   lcd.fill_rect(10, 10, 100, 50, :red)
-  #   lcd.text(10, 80, "Temp 23.5C", color: :white, scale: 2)
+  #   lcd.text(10, 80, "Hello", color: :white, scale: 2)
   #   lcd.close
   #
   # The controller tells a command byte from its parameters by the D/C line —

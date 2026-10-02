@@ -654,6 +654,100 @@ inside the envelope for the 3.3 V supply a Pi provides.
 
 Unconnected channels float and read whatever is nearby; that is not a fault.
 
+### Colour TFT — `Rgpio::ILI9341`
+
+The 2.4"/2.8" 240x320 SPI TFT modules driven by an Ilitek ILI9341, usually with
+an XPT2046 touch controller on the same board (see the next section). The
+display is driven from user space over spidev — no framebuffer driver and no
+config.txt change beyond enabling SPI. The controller tells commands from data
+by a D/C line, so D/C (and RESET, if wired) are GPIO outputs next to the bus.
+
+```ruby
+lcd = Rgpio::ILI9341.new(dc: 24, reset: 25, backlight: 18)
+lcd.fill(:black)
+lcd.fill_rect(10, 10, 100, 50, :red)
+lcd.pixel(5, 5, [0, 128, 255])
+lcd.text(10, 80, "Hello", color: :white, scale: 2)
+lcd.text(10, 110, "rgpio", color: :yellow, bg: :navy, scale: 3)
+lcd.rotation = 90             # 0, 90, 180, 270; width / height follow
+lcd.close
+```
+
+Wiring (the module's pin names):
+
+| Module | Pi |
+|---|---|
+| VCC / GND | 3.3 V / GND |
+| CS | GPIO8 (CE0) |
+| RESET | GPIO25 |
+| DC | GPIO24 |
+| SDI (MOSI) | GPIO10 |
+| SCK | GPIO11 |
+| LED | GPIO18 (or 3.3 V for always on) |
+| SDO (MISO) | leave unconnected |
+
+Nothing is read back from the display, and on some modules SDO holds MISO and
+spoils touch readings, so leave it off.
+
+- **Colours** are anything `Rgpio::RGB565.from` takes: a name (`:red`,
+  `:orange`, `:navy`, … — see `Rgpio::RGB565::COLORS`), an `[r, g, b]` triple
+  of 0..255, or an RGB565 Integer.
+- **Text** uses a built-in 5x7 font (printable ASCII; anything else draws as a
+  box), `scale:` multiplies it, and `"\n"` starts a new line. With `bg:` each
+  character cell is painted in full, which overwrites old text cleanly and is
+  faster; without it only the strokes are drawn. `text_size` measures first.
+- **Raw pixels:** `blit(x, y, w, h, data)` copies `w * h * 2` bytes of RGB565,
+  high byte first, row by row.
+- Drawing is clipped to the screen and locked, so a touch callback on another
+  thread can draw while the main thread does.
+- **Clock:** `speed_hz:` defaults to 24 MHz. A Pi 5 divides its 200 MHz SPI
+  clock by an even number, so that is really 20 MHz, and a full-screen `fill`
+  takes about 65 ms. 32 MHz (25 MHz real) garbled the picture on jumper wires.
+- **Backlight:** `backlight: 18` gives on/off (`lcd.backlight = false`);
+  `backlight_pwm: true` dims it with software PWM (`lcd.backlight = 0.3`).
+- `invert = true` and `bgr: false` are for panels that show complementary or
+  red/blue-swapped colours; the common red-board module needs neither.
+
+### Touch panel — `Rgpio::XPT2046`
+
+The resistive touch controller on the same modules, on the same bus with chip
+select CE1. It shares SCLK and MOSI with the display:
+
+| Module | Pi |
+|---|---|
+| T_CLK | GPIO11 (shared with SCK) |
+| T_DIN | GPIO10 (shared with SDI) |
+| T_DO | GPIO9 (MISO) |
+| T_CS | GPIO7 (CE1) |
+| T_IRQ | GPIO17 (optional) |
+
+```ruby
+chip  = Rgpio::Chip.new
+lcd   = Rgpio::ILI9341.new(dc: 24, reset: 25, backlight: 18, chip: chip)
+touch = Rgpio::XPT2046.new(irq: 17, chip: chip,
+                           calibration: [0.0662, 0.0003, -20.25, 0.0004, -0.0904, 351.86])
+
+touch.when_touched  { |x, y| lcd.fill_rect(x - 2, y - 2, 5, 5, :yellow) }
+touch.when_released { puts "released" }
+Rgpio.pause
+
+touch.position     # => [x, y] in screen coordinates, or nil when untouched
+touch.raw          # => [x, y, pressure], the converter's 12-bit readings
+```
+
+- **Calibration** maps the panel's raw readings to screen pixels; it differs
+  from panel to panel. `XPT2046.calibration_from(screen_points, raw_points)`
+  fits one from three or more touches on known points, and swapped or mirrored
+  axes need no flags. `examples/touch_paint.rb` walks through it and prints
+  the six numbers to pass as `calibration:`. Without one, `position` is the raw
+  `[x, y]`.
+- **Pressure:** a reading counts as a touch when its pressure reaches
+  `threshold` (300). Measured on a 2.8" panel: 3–74 untouched, 1100–2400
+  pressed lightly or firmly.
+- **T_IRQ** lets the watcher thread sleep until the panel is pressed; without
+  `irq:` it polls every 20 ms. `when_touched` fires once per press — to follow
+  a moving finger, poll `position` in a loop as `examples/touch_paint.rb` does.
+
 
 ## Running the examples
 
@@ -701,6 +795,12 @@ ruby examples/adc.rb
 
 # Dim an LED from a potentiometer through the MCP3208
 ruby examples/adc_led.rb
+
+# Fills, text and the four rotations on an ILI9341 TFT
+ruby examples/tft.rb
+
+# Calibrate the XPT2046 touch panel, then draw with a finger
+ruby examples/touch_paint.rb
 ```
 
 `examples/lowlevel/` holds the same LED and button demos written directly
@@ -825,6 +925,8 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | `#transfer(bytes, speed_hz:, delay_us:)` | Full-duplex transfer → `Array<Integer>` |
 | `#write(*bytes)` | Transfer, ignoring what came back |
 | `#read(count)` | Transfer of zeros, keeping what came back |
+| `#send_bytes(data)` | Send a block of any length, tx-only, in messages of `.max_transfer_size` |
+| `.max_transfer_size` | Largest message spidev accepts (its `bufsiz`, 4096 by default) |
 | `#speed_hz` / `#mode` / `#bits_per_word` (and `=`) | Bus settings |
 | `#bus` / `#device` / `#path` | What this device was opened on |
 | `#close` / `#closed?` | Close the bus device |
@@ -840,6 +942,44 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | `#read_all` | Every channel, sampled consecutively |
 | `#channels` / `#reference_voltage` / `#spi` | What it was configured with |
 | `#close` / `#closed?` | Close the bus device, if this converter opened it |
+
+### `Rgpio::ILI9341`
+
+| Method | Description |
+|---|---|
+| `.new(dc:, reset:, backlight:, backlight_pwm: false, rotation: 0, bgr: true, bus: 0, device: 0, speed_hz:, spi:, chip:)` | Open and initialise the display |
+| `.open(...) { \|lcd\| }` | Block form; closes on exit |
+| `#fill(color)` / `#fill_rect(x, y, w, h, color)` / `#pixel(x, y, color)` | Draw, clipped to the screen |
+| `#blit(x, y, w, h, data)` | Copy raw RGB565 bytes |
+| `#text(x, y, str, color:, bg:, scale:)` | 5x7 text; returns `[width, height]` drawn |
+| `#text_size(str, scale:)` | `[width, height]` that `#text` would draw |
+| `#rotation` / `#rotation=` | 0, 90, 180, 270 |
+| `#width` / `#height` | Screen size at the current rotation |
+| `#invert=(on)` | Complement every colour |
+| `#backlight=(level)` | `true` / `false`, or 0.0..1.0 with `backlight_pwm: true` |
+| `#reset!` | Reset and re-initialise; the picture is lost |
+| `#spi` | The bus device |
+| `#close` / `#closed?` | Release the lines, and the bus and chip if opened here |
+
+### `Rgpio::XPT2046`
+
+| Method | Description |
+|---|---|
+| `.new(irq:, calibration:, threshold: 300, bus: 0, device: 1, speed_hz:, spi:, chip:)` | Open the touch controller |
+| `.calibration_from(screen, raw)` | Fit six calibration numbers from ≥3 touches |
+| `#raw` | `[x, y, pressure]`, 12-bit readings |
+| `#touched?` | Pressure at or above `threshold` |
+| `#position` | `[x, y]` in screen coordinates (raw without a calibration), or `nil` |
+| `#when_touched { \|x, y\| }` / `#when_released { }` | Callbacks, once per press |
+| `#calibration` / `#calibration=` / `#threshold` / `#threshold=` | Settings |
+| `#close` / `#closed?` | Stop the watcher; release the line, bus and chip if opened here |
+
+### `Rgpio::RGB565`
+
+| Method | Description |
+|---|---|
+| `.from(value)` | A name from `COLORS`, `[r, g, b]` or an Integer → RGB565 |
+| `.pack(r, g, b)` | 8-bit channels → RGB565 |
 
 ### `Rgpio::ADT7410`
 
