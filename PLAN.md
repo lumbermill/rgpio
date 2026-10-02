@@ -342,8 +342,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     it holds MISO and corrupts touch reads), hardware scrolling, images from
     files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
   - To check on hardware (Pi 5 / Trixie and Pi 4; Pi 5 items above are done):
-    the touch threshold and
-    calibration, and that touches are not lost while the screen is drawing.
+    touch calibration, and that touches are not lost while the screen is drawing.
   - **Clock, Pi 5 (ILITEK ILI9341 on jumper wires):** the default was 32 MHz
     and `examples/tft.rb` failed every run — the first red fill showed, then
     the panel went whitish and ignored the rest. 8, 16 and 24 MHz ran it
@@ -362,6 +361,10 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     `backlight_pwm: true` (software PWM, 100 Hz) dims cleanly through 1.0 /
     0.5 / 0.2 / 0.05 / 0.0 and fades without visible flicker, so there is no
     need for a hardware-PWM option on the backlight.
+  - **XPT2046 threshold (Pi 5, T_IRQ on GPIO17):** untouched pressure reads
+    3–74 (x 0, y 4095); a press, light or firm, reads 1186–2363 from the first
+    sample, and x/y track a moving finger. The default threshold of 300 sits
+    well clear of both, so it stays.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's
