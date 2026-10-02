@@ -341,9 +341,8 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   - Not done: reading from the display (SDO is left unconnected — on some boards
     it holds MISO and corrupts touch reads), hardware scrolling, images from
     files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
-  - To check on hardware (Pi 5 / Trixie and Pi 4): the init sequence and
-    MADCTL/BGR on the actual module, `invert=` needed or not, the four
-    rotations, full-screen `fill` time, PWM backlight, the touch threshold and
+  - To check on hardware (Pi 5 / Trixie and Pi 4; Pi 5 items above are done):
+    PWM backlight, the touch threshold and
     calibration, and that touches are not lost while the screen is drawing.
   - **Clock, Pi 5 (ILITEK ILI9341 on jumper wires):** the default was 32 MHz
     and `examples/tft.rb` failed every run — the first red fill showed, then
@@ -356,6 +355,10 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   - **`:orange` is [255, 100, 0] (0xfb20), not HTML orange.** On the panel,
     255,165,0 looked yellow at every clock; side by side with 255,128,0 and
     255,100,0, the last read as orange.
+  - **Verified on Pi 5:** init sequence, MADCTL with BGR (red fills red, no
+    swap) and no `invert=` needed on this module; all four rotations put the
+    origin top-left with text the right way round. A full-screen `fill` takes
+    64–67 ms at the 24 MHz default (theory 61 ms at the real 20 MHz).
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's
