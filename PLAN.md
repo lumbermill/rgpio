@@ -114,7 +114,6 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
   unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
-- `RotaryEncoder` — written + unit-tested, not yet on hardware; see Phase 3 below.
 - `ILI9341` / `XPT2046` — written + unit-tested, not yet on hardware; see Phase 3 below.
 
 Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
@@ -182,7 +181,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 |---|---|---|---|
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
-| 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | 🟡 written + unit-tested, hardware verification pending |
+| 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 written + unit-tested, hardware verification pending |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
@@ -303,10 +302,13 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   constructor, not on the first callback, so `steps` counts without one.
   Callbacks fire on every detent, including at a `max_steps` bound where
   `steps` does not move. No kernel debounce by default (`debounce_us:` is
-  there); the shaft switch is left to `Button`. Still to check on hardware with
-  a KY-040: no missed steps turning slowly or fast, the direction convention
-  (A before B = clockwise), the bound/`wrap:` ends, and whether `debounce_us`
-  of ~1 ms is needed at all. Stays out of the guide until then.
+  there); the shaft switch is left to `Button`. Verified on Pi 5 (2026-10-02)
+  with an Alps EC12E2420801 (24 detents, 24 pulses per turn, no switch) on a
+  DIP adapter board — A/C/B, C to GND, internal pull-ups: one callback per
+  detent turning slowly, no lost steps turning fast, A-before-B is clockwise
+  with A on GPIO17, the count stops at ±16 and `wrap: true` carries on from
+  the other end — all with no `debounce_us`. A KY-040 module has not been on the bench; it is the same
+  signal behind on-board pull-ups.
 - `ILI9341` / `XPT2046` (3f) are for a possible section on the 2.8" SPI TFT
   with touch, as the graphic step after `ST7032`. Decisions taken:
   - **User-space SPI, not a kernel driver.** `dtoverlay=mipi-dbi-spi` / fbtft

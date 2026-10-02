@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rgpio::RotaryEncoder` for quadrature encoders such as the KY-040:
   `steps` / `steps=` / `value`, `max_steps:` with optional `wrap:`, and
   `when_rotated` / `when_rotated_clockwise` / `when_rotated_counter_clockwise`
-  callbacks, with `examples/rotary_encoder.rb`. Unit-tested; not yet verified
-  on hardware.
+  callbacks, with `examples/rotary_encoder.rb`. Verified on Pi 5 with a bare
+  three-pin encoder, no debounce needed.
 - `Rgpio::ILI9341` for 240x320 SPI colour TFTs: `fill` / `fill_rect` /
   `pixel`, `blit` of raw RGB565, `text` in a built-in 5x7 font with `scale:`
   and optional background, `rotation=`, `invert=`, and an on/off or PWM

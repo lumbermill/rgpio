@@ -18,6 +18,10 @@
 # Run:
 #   ruby examples/rotary_encoder.rb
 #
+# A bare encoder (three pins A / C / B, as verified on a Pi 5) needs no board:
+# A to GPIO17, C (the middle pin) to GND, B to GPIO18 — the internal pull-ups
+# do the rest. Without a shaft switch, leave GPIO27 unconnected.
+#
 # Turn the knob; the count stops at ±16. Press the knob to reset it to 0. Stop
 # with Ctrl-C. If clockwise counts down, swap a: and b: (or CLK and DT).
 

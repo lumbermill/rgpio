@@ -85,7 +85,7 @@ If it fails with `Errno::EACCES`, add yourself to the `gpio` group
 
 | Area | Classes | Guide |
 |---|---|---|
-| Digital devices (gpiozero-style) | `LED`, `Button`, `Motor` | [Device API](docs/guide.md#device-api) |
+| Digital devices (gpiozero-style) | `LED`, `Button`, `RotaryEncoder`, `Motor` | [Device API](docs/guide.md#device-api) |
 | PWM devices | `PWMLED`, `RGBLED`, `Servo` | [Device API](docs/guide.md#device-api), [Software PWM](docs/guide.md#software-pwm) |
 | Raw GPIO | `Chip`, `LineRequest` | [GPIO Usage](docs/guide.md#gpio-usage) |
 | Hardware PWM | `HardwarePWM` | [Hardware PWM Usage](docs/guide.md#hardware-pwm-usage) |
@@ -96,7 +96,7 @@ Every class is documented in full in **[docs/guide.md](docs/guide.md)**, with
 wiring notes, the [API reference](docs/guide.md#api-reference) and
 [how to run the examples](docs/guide.md#running-the-examples) in
 [`examples/`](examples). Devices written but still waiting on hardware
-verification (such as `MotionSensor`, `RotaryEncoder` and the `ILI9341` TFT)
+verification (such as `MotionSensor` and the `ILI9341` TFT)
 are listed in [PLAN.md](PLAN.md).
 
 ## Project status

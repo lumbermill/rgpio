@@ -18,7 +18,7 @@ in [PLAN.md](../PLAN.md).
 
 ## Device API
 
-`LED`, `Button`, `Motor`, `PWMLED`, `RGBLED` and `Servo` wrap `Chip` /
+`LED`, `Button`, `RotaryEncoder`, `Motor`, `PWMLED`, `RGBLED` and `Servo` wrap `Chip` /
 `LineRequest` in one object per piece of hardware, in the style of Python's
 gpiozero. A device opens its own chip
 unless you hand it one with `chip:`, and `#close` releases only what it owns.
@@ -72,6 +72,43 @@ kernel for 5 ms (`debounce_us:` to change it), so one press fires one callback.
 `active_low: true` inverts the logic, and the callbacks follow it: the kernel
 reports edges in logical terms, so `when_pressed` fires when the line goes
 *low*.
+
+### RotaryEncoder
+
+```ruby
+require "rgpio"
+
+encoder = Rgpio::RotaryEncoder.new(a: 17, b: 18, max_steps: 16)
+
+encoder.when_rotated_clockwise         { puts "CW  #{encoder.steps}" }
+encoder.when_rotated_counter_clockwise { puts "CCW #{encoder.steps}" }
+
+Rgpio.pause
+encoder.close
+```
+
+For a mechanical quadrature encoder. A bare part has three pins, usually
+marked A, C and B: wire C (the middle one) to GND and A and B to two GPIO
+lines — the internal pull-ups that `pull_up: true` (the default) selects are
+all it needs. A module such as the KY-040 labels them CLK (A), DT (B), `+` and
+GND; power `+` from **3.3 V**, never 5 V, since its pull-ups go to that pin.
+
+`#steps` counts detents, clockwise positive, and is held within
+`-max_steps..max_steps`. At a bound it stops, or with `wrap: true` carries on
+from the other end (16 → -16), for a menu that goes round. `max_steps: 0`
+removes the bound. `#value` is `steps / max_steps` as -1.0..1.0, ready to hand
+to a `Servo` or `PWMLED`; `#steps=` sets the count.
+
+`when_rotated` fires on every detent in either direction, and
+`when_rotated_clockwise` / `when_rotated_counter_clockwise` in one. They fire
+at a bound too, where `#steps` does not move. Unlike `Button`, the watcher
+thread starts with the device, so `#steps` counts with no callback set.
+
+Clockwise means A changes before B; if a knob counts backwards, swap `a:` and
+`b:`. Each detent is four transitions of the two phases, and a step is counted
+only when they come back to rest, so contact bounce cancels itself out with no
+debounce (`debounce_us:` is there if a worn part needs it). A push switch on
+the shaft is a separate contact: read it with `Button`.
 
 ### Motor
 
@@ -629,6 +666,9 @@ ruby examples/led.rb
 # Print Pressed / Released for a switch on GPIO4
 ruby examples/button.rb
 
+# Count the turns of a rotary encoder on GPIO17/18
+ruby examples/rotary_encoder.rb
+
 # Drive a DC motor forward and backward through a DRV8835
 ruby examples/motor.rb
 
@@ -738,6 +778,18 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | `#when_pressed { }` / `#when_released { }` | `Button` edge callbacks, run on a watcher thread |
 | `#gpio` | Line offset this device reads |
 | `#close` / `#closed?` | Stop the watcher and release the line |
+
+### `Rgpio::RotaryEncoder`
+
+| Method | Description |
+|---|---|
+| `.new(a:, b:, max_steps: 16, wrap: false, pull_up: true, debounce_us: 0, chip:, consumer:)` | Claim both phases; `max_steps: 0` for no bound |
+| `#steps` / `#steps=` | Detents turned, clockwise positive, bounded (or wrapped) by `max_steps` |
+| `#value` | `steps / max_steps`, -1.0..1.0 (0.0 when unbounded) |
+| `#when_rotated { }` | Every detent, either direction |
+| `#when_rotated_clockwise { }` / `#when_rotated_counter_clockwise { }` | Every detent in one direction |
+| `#a` / `#b` / `#max_steps` / `#wrap?` | Configuration |
+| `#close` / `#closed?` | Stop the watcher and release both lines |
 
 ### `Rgpio::Motor`
 
@@ -890,8 +942,8 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  LED / Button / Motor / PWMLED / RGBLED / Servo         │  device classes (gpiozero-style)
-│  ADT7410 / ST7032 / MCP3208                             │  (one object per part)
+│  LED / Button / RotaryEncoder / Motor / PWMLED / RGBLED │  device classes (gpiozero-style)
+│  Servo / ADT7410 / ST7032 / MCP3208                     │  (one object per part)
 ├─────────────────────────────────────────────────────────┤
 │  Rgpio::Chip / LineRequest                              │  OOP wrappers (this gem)
 ├──────────────────┬──────────────────┬───────────────────┤
@@ -903,8 +955,8 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 - **Layer 1 (`Native`)** — raw `fiddle` declarations of the libgpiod C functions
 - **Layer 2 (`Chip`, `LineRequest`, `HardwarePWM`, `SoftwarePWM`, `I2C`, `SPI`)** — Ruby-idiomatic wrappers
-- **Layer 3 (`LED`, `Button`, `Motor`, `PWMLED`, `RGBLED`, `Servo`, `ADT7410`,
-  `ST7032`, `MCP3208`)** — one object per piece of hardware
+- **Layer 3 (`LED`, `Button`, `RotaryEncoder`, `Motor`, `PWMLED`, `RGBLED`,
+  `Servo`, `ADT7410`, `ST7032`, `MCP3208`)** — one object per piece of hardware
 
 
 ## Why libgpiod?
