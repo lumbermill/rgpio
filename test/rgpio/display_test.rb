@@ -376,6 +376,20 @@ class DisplayTest < Minitest::Test
     assert_nil touch.position
   end
 
+  def test_a_pen_landing_or_lifting_mid_read_does_not_count_as_a_touch
+    spi = FakeTouchSPI.new
+    # The untouched x/y, with the pressure arriving only after them.
+    spi.press(0, 4095)
+    spi.pressures = [0, 1000]
+    touch = Rgpio::XPT2046.new(spi: spi)
+
+    assert_nil touch.position
+    spi.press(2000, 2000)
+    spi.pressures = [1000, 0]
+
+    assert_nil touch.position
+  end
+
   def test_raw_takes_the_median_and_drops_the_first_conversion
     spi = FakeTouchSPI.new
     spi.readings[Rgpio::XPT2046::CMD_X] = [4000, 100, 105, 3000, 102, 101]

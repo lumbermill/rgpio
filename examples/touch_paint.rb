@@ -20,6 +20,8 @@
 
 require_relative "../lib/rgpio"
 
+$stdout.sync = true
+
 MARGIN = 20
 BAR = 24
 
@@ -46,7 +48,8 @@ def calibrate(lcd, touch)
   w = lcd.width
   h = lcd.height
   targets = [[MARGIN, MARGIN], [w - MARGIN, MARGIN], [w - MARGIN, h - MARGIN], [MARGIN, h - MARGIN], [w / 2, h / 2]]
-  raw = targets.map do |x, y|
+  raw = targets.each_with_index.map do |(x, y), i|
+    puts "   cross #{i + 1}/#{targets.size} at #{x}, #{y}"
     lcd.fill(:black)
     lcd.text(30, (h / 2) + 30, "Touch the cross", scale: 2)
     cross(lcd, x, y, :white)
@@ -66,9 +69,11 @@ lcd = Rgpio::ILI9341.new(dc: 24, reset: 25, backlight: 18, chip: chip)
 touch = Rgpio::XPT2046.new(irq: 17, chip: chip)
 
 begin
+  puts "1) calibration: touch the centre of each cross"
   touch.calibration = calibrate(lcd, touch)
   puts "calibration: #{touch.calibration.map { |c| c.round(5) }.inspect}"
   clear(lcd)
+  puts "2) draw (grey strip at the top clears; Ctrl-C to stop)"
 
   # The callbacks run on the touch watcher thread; the loop below polls
   # #position on the main thread. Both can draw: the display serialises them.

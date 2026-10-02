@@ -142,13 +142,15 @@ module Rgpio
       raise Error, "#{self.class} is closed" if @closed
 
       @lock.synchronize do
+        # Pressure is read on both sides of the position and the lower one
+        # kept: a pen landing or lifting part-way through leaves x/y unsettled
+        # (or at the untouched 0/4095), and one of the two pressures reads low.
+        z_before = read_pressure
         # The first conversion after the drivers switch on is still settling.
         read_channel(CMD_X)
         x = median(SAMPLES) { read_channel(CMD_X) }
         y = median(SAMPLES) { read_channel(CMD_Y) }
-        z1 = read_channel(CMD_Z1)
-        z2 = read_channel(CMD_Z2)
-        [x, y, z1 + (RESOLUTION - 1) - z2]
+        [x, y, [z_before, read_pressure].min]
       end
     end
 
@@ -199,6 +201,10 @@ module Rgpio
     def read_channel(cmd)
       received = @spi.transfer([cmd, 0x00, 0x00])
       ((received[1] << 8) | received[2]) >> 3
+    end
+
+    def read_pressure
+      read_channel(CMD_Z1) + (RESOLUTION - 1) - read_channel(CMD_Z2)
     end
 
     def median(count, &)

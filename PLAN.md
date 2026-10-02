@@ -182,7 +182,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a | `LED` / `Button` / `Motor` / `Rgpio.pause` | LED点滅, スイッチ, モータードライバ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3a′ | `MotionSensor` | モーションセンサ | ⏸ written + unit-tested, hardware verification deferred |
 | 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
-| 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 written + unit-tested, hardware verification pending |
+| 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | 🟡 verified on Pi 5, Pi 4 pending |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see the guide |
@@ -341,8 +341,8 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   - Not done: reading from the display (SDO is left unconnected — on some boards
     it holds MISO and corrupts touch reads), hardware scrolling, images from
     files (`blit` takes RGB565 bytes; decoding PNG/JPEG would need a gem).
-  - To check on hardware (Pi 5 / Trixie and Pi 4; Pi 5 items above are done):
-    touch calibration, and that touches are not lost while the screen is drawing.
+  - To check on hardware: everything above again on the Pi 4 (different SPI
+    clock dividers, so the 24 MHz default needs its own check there).
   - **Clock, Pi 5 (ILITEK ILI9341 on jumper wires):** the default was 32 MHz
     and `examples/tft.rb` failed every run — the first red fill showed, then
     the panel went whitish and ignored the rest. 8, 16 and 24 MHz ran it
@@ -365,6 +365,16 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     3–74 (x 0, y 4095); a press, light or firm, reads 1186–2363 from the first
     sample, and x/y track a moving finger. The default threshold of 300 sits
     well clear of both, so it stays.
+  - **Touch on Pi 5:** `examples/touch_paint.rb` calibrates in five touches
+    (e.g. `[0.06617, 0.00033, -20.25155, 0.00035, -0.09042, 351.86323]`) and
+    lands under the finger up to the edges; one touched/released pair per
+    press, and no touches lost while the screen clears. Fast strokes leave
+    gaps between dots, as expected from one dot per reading. Found there:
+    stray dots and stray clears, because pressure was read once *after* x/y —
+    a pen landing or lifting mid-read paired a valid pressure with the
+    untouched x 0 / y 4095 (screen y about -18, inside the clear strip).
+    `raw` now reads pressure before and after x/y and keeps the lower; the
+    strays stopped.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's
