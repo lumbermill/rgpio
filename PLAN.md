@@ -353,6 +353,9 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
     Odd detail: a separate script doing several fills at 32 MHz passed, so the
     failure looks pattern-dependent (signal integrity) rather than a protocol
     bug. Default lowered to 24 MHz (20 MHz real).
+  - **`:orange` is [255, 100, 0] (0xfb20), not HTML orange.** On the panel,
+    255,165,0 looked yellow at every clock; side by side with 255,128,0 and
+    255,100,0, the last read as orange.
 - `wait_for_press` / `LED#blink` are deliberately not implemented yet — no book
   sample needs them.
 - `Motor` has no speed control (it would need PWM on both lines); the book's

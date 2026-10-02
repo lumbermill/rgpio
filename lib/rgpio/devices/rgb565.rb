@@ -2,7 +2,7 @@ module Rgpio
   # 16-bit colour as colour TFT controllers take it: 5 bits red, 6 green,
   # 5 blue, sent high byte first.
   #
-  #   Rgpio::RGB565.from(:orange)         # => 0xfd20
+  #   Rgpio::RGB565.from(:orange)         # => 0xfb20
   #   Rgpio::RGB565.from([255, 128, 0])   # => 0xfc00
   #   Rgpio::RGB565.from(0x07e0)          # => 0x07e0
   module RGB565
@@ -15,7 +15,7 @@ module Rgpio
       yellow: 0xffe0,
       cyan: 0x07ff,
       magenta: 0xf81f,
-      orange: 0xfd20,
+      orange: 0xfb20, # [255, 100, 0]: 255,165,0 looks yellow on these panels
       gray: 0x8410,
       navy: 0x0010,
       maroon: 0x8000,
