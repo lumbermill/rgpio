@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `touched?`, `position`, `when_touched` / `when_released` (T_IRQ optional),
   and `XPT2046.calibration_from` to fit screen coordinates from a few touches.
   A reading taken while the pen lands or lifts is discarded. With
-  `examples/touch_paint.rb`. Verified on Pi 5.
+  `examples/touch_paint.rb` and `examples/ruby_stack.rb` (tap to drop rubies
+  that pile up, in landscape). Verified on Pi 5.
 - `Rgpio::RGB565` (colour names, `[r, g, b]` and RGB565 integers) and
   `Rgpio::Font5x7`, shared by the display classes.
 - `SPI#send_bytes` sends a block of any length tx-only, split at

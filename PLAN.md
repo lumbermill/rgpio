@@ -11,7 +11,7 @@ anything here is subject to change.
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
 | **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
-| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d and 3f verified on Pi 5 (`MotionSensor` deferred); 3e pending |
+| **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d and 3f verified on Pi 5 (`MotionSensor` deferred, camera dropped); 3e pending |
 
 ## Multi-board support — validation status
 
@@ -185,7 +185,8 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see the guide |
-| 3e | Camera examples shelling out to `rpicam-still` | モーション+撮影, 測距センサ | ⬜ |
+| 3e | Distance sensor (part to be decided) | 測距センサ | ⬜ |
+| — | ~~Camera examples shelling out to `rpicam-still`~~ | モーション+撮影 | ✂️ out of scope — not GPIO; `rpicam-still` needs no gem code |
 
 I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
 `/dev/spidevN.M`, so they stay dependency-free like the sysfs PWM code.

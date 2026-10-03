@@ -739,7 +739,8 @@ touch.raw          # => [x, y, pressure], the converter's 12-bit readings
   from panel to panel. `XPT2046.calibration_from(screen_points, raw_points)`
   fits one from three or more touches on known points, and swapped or mirrored
   axes need no flags. `examples/touch_paint.rb` walks through it and prints
-  the six numbers to pass as `calibration:`. Without one, `position` is the raw
+  the six numbers to pass as `calibration:`. A calibration belongs to the
+  rotation it was taken at; calibrate again after changing `rotation`. Without one, `position` is the raw
   `[x, y]`.
 - **Pressure:** a reading counts as a touch when its pressure reaches
   `threshold` (300). Measured on a 2.8" panel: 3–74 untouched, 1100–2400
@@ -801,6 +802,9 @@ ruby examples/tft.rb
 
 # Calibrate the XPT2046 touch panel, then draw with a finger
 ruby examples/touch_paint.rb
+
+# Tap to drop rubies that pile up, in landscape
+ruby examples/ruby_stack.rb
 ```
 
 `examples/lowlevel/` holds the same LED and button demos written directly

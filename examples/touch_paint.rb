@@ -13,50 +13,19 @@
 #
 # Run:
 #   ruby examples/touch_paint.rb
+#   ruby examples/touch_paint.rb <six calibration numbers>   # skip calibrating
 #
 # Touch the centre of each cross as it appears. The calibration is printed so
-# it can be passed as `calibration: [...]` in a script of your own. Then draw;
-# touching the grey strip at the top clears the screen. Ctrl-C to stop.
+# it can be passed on the command line next time, or as `calibration: [...]`
+# in a script of your own. Then draw; touching the grey strip at the top clears
+# the screen. Ctrl-C to stop.
 
 require_relative "../lib/rgpio"
+require_relative "touch_calibration"
 
 $stdout.sync = true
 
-MARGIN = 20
 BAR = 24
-
-def cross(lcd, x, y, color)
-  lcd.fill_rect(x - 10, y, 21, 1, color)
-  lcd.fill_rect(x, y - 10, 1, 21, color)
-end
-
-# Wait for a press, average the raw readings while it is held, then wait for
-# the release.
-def raw_touch(touch)
-  sleep 0.01 until touch.touched?
-  samples = []
-  while (sample = touch.raw)[2] >= touch.threshold
-    samples << sample
-    sleep 0.01
-  end
-  sleep 0.2
-  samples = samples.drop(2) if samples.size > 4 # the first readings are still landing
-  [samples.sum { |s| s[0] } / samples.size, samples.sum { |s| s[1] } / samples.size]
-end
-
-def calibrate(lcd, touch)
-  w = lcd.width
-  h = lcd.height
-  targets = [[MARGIN, MARGIN], [w - MARGIN, MARGIN], [w - MARGIN, h - MARGIN], [MARGIN, h - MARGIN], [w / 2, h / 2]]
-  raw = targets.each_with_index.map do |(x, y), i|
-    puts "   cross #{i + 1}/#{targets.size} at #{x}, #{y}"
-    lcd.fill(:black)
-    lcd.text(30, (h / 2) + 30, "Touch the cross", scale: 2)
-    cross(lcd, x, y, :white)
-    raw_touch(touch)
-  end
-  Rgpio::XPT2046.calibration_from(targets, raw)
-end
 
 def clear(lcd)
   lcd.fill(:black)
@@ -69,9 +38,7 @@ lcd = Rgpio::ILI9341.new(dc: 24, reset: 25, backlight: 18, chip: chip)
 touch = Rgpio::XPT2046.new(irq: 17, chip: chip)
 
 begin
-  puts "1) calibration: touch the centre of each cross"
-  touch.calibration = calibrate(lcd, touch)
-  puts "calibration: #{touch.calibration.map { |c| c.round(5) }.inspect}"
+  touch.calibration = TouchCalibration.load_or_run(lcd, touch)
   clear(lcd)
   puts "2) draw (grey strip at the top clears; Ctrl-C to stop)"
 
