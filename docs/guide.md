@@ -689,6 +689,12 @@ Wiring (the module's pin names):
 Nothing is read back from the display, and on some modules SDO holds MISO and
 spoils touch readings, so leave it off.
 
+![Wiring of the ILI9341 module and its XPT2046 touch controller to the Pi header](images/ili9341_wiring.svg)
+
+The same wiring by physical pin, touch lines included. SCK/T_CLK and
+SDI/T_DIN share one header pin each. Watch the two 18s: DC goes to physical
+pin 18 (GPIO24), and LED to GPIO18 (physical pin 12).
+
 - **Colours** are anything `Rgpio::RGB565.from` takes: a name (`:red`,
   `:orange`, `:navy`, … — see `Rgpio::RGB565::COLORS`), an `[r, g, b]` triple
   of 0..255, or an RGB565 Integer.
