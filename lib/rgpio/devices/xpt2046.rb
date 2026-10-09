@@ -141,17 +141,7 @@ module Rgpio
     def raw
       raise Error, "#{self.class} is closed" if @closed
 
-      @lock.synchronize do
-        # Pressure is read on both sides of the position and the lower one
-        # kept: a pen landing or lifting part-way through leaves x/y unsettled
-        # (or at the untouched 0/4095), and one of the two pressures reads low.
-        z_before = read_pressure
-        # The first conversion after the drivers switch on is still settling.
-        read_channel(CMD_X)
-        x = median(SAMPLES) { read_channel(CMD_X) }
-        y = median(SAMPLES) { read_channel(CMD_Y) }
-        [x, y, [z_before, read_pressure].min]
-      end
+      sample
     end
 
     # @return [Boolean] whether the panel is pressed at least #threshold hard
@@ -162,8 +152,7 @@ module Rgpio
     # @return [Array(Integer, Integer), nil] the touch in screen coordinates,
     #   or nil when untouched
     def position
-      x, y, z = raw
-      z >= @threshold ? to_screen(x, y) : nil
+      locate(raw)
     end
 
     # @yieldparam x [Integer] screen x of the touch
@@ -195,6 +184,30 @@ module Rgpio
     end
 
     private
+
+    # #raw without the closed check. The watcher reads through this: #close
+    # marks the device closed before it waits for the watcher, and the bus
+    # stays open until that wait is over, so the watcher's last poll is safe.
+    def sample
+      @lock.synchronize do
+        # Pressure is read on both sides of the position and the lower one
+        # kept: a pen landing or lifting part-way through leaves x/y unsettled
+        # (or at the untouched 0/4095), and one of the two pressures reads low.
+        z_before = read_pressure
+        # The first conversion after the drivers switch on is still settling.
+        read_channel(CMD_X)
+        x = median(SAMPLES) { read_channel(CMD_X) }
+        y = median(SAMPLES) { read_channel(CMD_Y) }
+        [x, y, [z_before, read_pressure].min]
+      end
+    end
+
+    # @return [Array(Integer, Integer), nil] screen position of a reading, or
+    #   nil when it is not pressed hard enough
+    def locate(reading)
+      x, y, z = reading
+      z >= @threshold ? to_screen(x, y) : nil
+    end
 
     # The 12-bit result arrives MSB first after the command byte, left-aligned
     # with three trailing zero bits.
@@ -249,7 +262,7 @@ module Rgpio
       else
         sleep(POLL_INTERVAL)
       end
-      position
+      locate(sample)
     end
 
     # Report a touch, then poll until it lifts. Conversions make PENIRQ drop
@@ -257,7 +270,7 @@ module Rgpio
     # rather than read as new touches.
     def follow_touch(x, y)
       dispatch(:touched, x, y)
-      sleep(POLL_INTERVAL) while @watching && touched?
+      sleep(POLL_INTERVAL) while @watching && sample[2] >= @threshold
       dispatch(:released)
       drain_edges
     end

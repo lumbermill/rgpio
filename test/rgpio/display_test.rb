@@ -471,6 +471,20 @@ class DisplayTest < Minitest::Test
     touch.close
   end
 
+  # close flags the device closed and then waits for the watcher, which is
+  # usually mid-poll; that last poll must not trip the closed check.
+  def test_closing_while_the_watcher_polls_is_quiet
+    20.times do
+      touch = Rgpio::XPT2046.new(spi: FakeTouchSPI.new)
+      touch.when_touched { nil }
+      sleep 0.01
+
+      _out, err = capture_io { touch.close }
+
+      assert_empty err
+    end
+  end
+
   def test_a_spurious_irq_edge_with_no_pressure_fires_nothing
     spi = FakeTouchSPI.new
     touch = Rgpio::XPT2046.new(irq: 17, spi: spi, chip: @chip)
