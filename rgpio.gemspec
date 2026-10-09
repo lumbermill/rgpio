@@ -19,11 +19,9 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = ">= 3.3"
 
-  # The guide and PLAN.md ship too: the README points at the guide for the full
-  # manual, and at PLAN.md for the roadmap and what has been verified on which
-  # board.
-  spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "LICENSE", "README.md", "CHANGELOG.md", "PLAN.md",
-                   "docs/**/*.md"]
+  # Code and examples, with the license, README and changelog. The guide is
+  # read on GitHub, where its diagrams render; documentation_uri links to it.
+  spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "LICENSE", "README.md", "CHANGELOG.md"]
 
   # `fiddle` is a default gem on Ruby <= 3.4 and a bundled gem from 3.5 on;
   # declaring it keeps the dependency satisfied either way. Unlike the
@@ -36,6 +34,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop", "~> 1.90"
 
   spec.metadata["source_code_uri"]       = "https://github.com/lumbermill/rgpio"
+  spec.metadata["documentation_uri"]     = "https://github.com/lumbermill/rgpio/blob/main/docs/guide.md"
   spec.metadata["changelog_uri"]         = "https://github.com/lumbermill/rgpio/blob/main/CHANGELOG.md"
   spec.metadata["bug_tracker_uri"]       = "https://github.com/lumbermill/rgpio/issues"
   spec.metadata["rubygems_mfa_required"] = "true"

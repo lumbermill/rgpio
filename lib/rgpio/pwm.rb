@@ -34,6 +34,10 @@ module Rgpio
   class HardwarePWM
     PWM_SYSFS_ROOT = "/sys/class/pwm".freeze
 
+    # The overlay setup, linked from chip-detection errors. The gem ships no
+    # docs of its own, so the messages point at the guide on GitHub.
+    GUIDE_URL = "https://github.com/lumbermill/rgpio/blob/main/docs/guide.md#hardware-pwm-usage".freeze
+
     # Device-tree model string, used to pick the board's PWM mapping.
     BOARD_MODEL_PATH = "/proc/device-tree/model".freeze
 
@@ -251,7 +255,7 @@ module Rgpio
       chips = self.class.available_chips
       if chips.empty?
         raise PWMError, "No PWM chips found under #{PWM_SYSFS_ROOT}. " \
-                        "Is the dtoverlay configured? See docs/guide.md."
+                        "Is the dtoverlay configured? See #{GUIDE_URL}"
       end
 
       profile = PWM_CHIP_PROFILE[@board]
@@ -273,7 +277,7 @@ module Rgpio
       chip_list = chips.map { |c| "pwmchip#{c[:chip]}(npwm=#{c[:npwm]})" }.join(", ")
       raise PWMError,
             "Cannot auto-detect the header PWM chip for board #{@board.inspect}. " \
-            "Available: #{chip_list}. Pass chip: <number> explicitly (see docs/guide.md)."
+            "Available: #{chip_list}. Pass chip: <number> explicitly (see #{GUIDE_URL})."
     end
 
     def export_channel
