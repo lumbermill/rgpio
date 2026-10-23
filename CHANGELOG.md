@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-23
+
+New devices for the Pi 5 round: a rotary encoder, and an SPI colour TFT with
+its touch panel. All of them are verified on Pi 5.
+
 ### Added
 
 - `Rgpio::RotaryEncoder` for quadrature encoders such as the KY-040:
@@ -121,5 +126,6 @@ waiting on hardware (Pi Zero / Pi 1, and `MotionSensor`).
   and reports `Rgpio.available? == false` rather than raising, so the sysfs-only
   `HardwarePWM` and the `ioctl`-only `I2C` and `SPI` stay usable there.
 
-[Unreleased]: https://github.com/lumbermill/rgpio/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/lumbermill/rgpio/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/lumbermill/rgpio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/lumbermill/rgpio/releases/tag/v0.1.0

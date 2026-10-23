@@ -11,9 +11,10 @@ Gem::Specification.new do |spec|
                      "PWM is either the hardware peripheral through sysfs or timed in Ruby on any line; " \
                      "I2C and SPI are ioctl calls on /dev/i2c-N and /dev/spidev, needing no libgpiod at " \
                      "all. On top sits a gpiozero-style device layer: LED, Button, Motor, PWMLED, RGBLED, " \
-                     "Servo, and drivers for the ADT7410 temperature sensor, ST7032 character LCD and " \
-                     "MCP3208 ADC. Bound through the stdlib `fiddle`, which is built with the interpreter " \
-                     "and so matches any Pi's architecture, unlike the precompiled `ffi` gem."
+                     "Servo, RotaryEncoder, and drivers for the ADT7410 temperature sensor, ST7032 " \
+                     "character LCD, MCP3208 ADC, ILI9341 colour TFT and XPT2046 touch panel. Bound " \
+                     "through the stdlib `fiddle`, which is built with the interpreter and so matches " \
+                     "any Pi's architecture, unlike the precompiled `ffi` gem."
   spec.homepage    = "https://github.com/lumbermill/rgpio"
   spec.license     = "MIT"
 

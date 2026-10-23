@@ -97,7 +97,7 @@ module Rgpio
       raw = ((msb << 8) | lsb)
       raw >>= 3 if resolution == 13
       sign_bit = resolution == 13 ? 0x1000 : 0x8000
-      raw -= sign_bit * 2 if raw & sign_bit != 0
+      raw -= sign_bit * 2 if raw.anybits?(sign_bit)
       raw / counts
     end
 

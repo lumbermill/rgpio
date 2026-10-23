@@ -100,7 +100,7 @@ verification (such as `MotionSensor`) are listed in [PLAN.md](PLAN.md).
 
 ## Project status
 
-`0.1.0` is the first release. It is `0.x` in earnest: everything documented
+The current release is `0.1.1`. It is `0.x` in earnest: everything documented
 has been exercised on real hardware, but the API may still change before `1.0`.
 
 - **Released changes:** [CHANGELOG.md](CHANGELOG.md)
