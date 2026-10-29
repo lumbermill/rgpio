@@ -306,6 +306,40 @@ end
 | `initial_value:` | `:active`, `:inactive` | `:inactive` | Output only |
 | `consumer:` | String | `nil` | Shown in `gpioinfo` |
 
+### Pins taken by another function
+
+Turning on a bus in `/boot/firmware/config.txt` (or with `raspi-config`) hands
+its pins to the kernel, and they stop being free GPIOs:
+
+| Enabled by | Pins |
+|---|---|
+| `dtparam=i2c_arm=on` (I2C) | GPIO2 (SDA), GPIO3 (SCL) |
+| `dtparam=spi=on` (SPI0) | GPIO7 (CE1), GPIO8 (CE0), GPIO9 (MISO), GPIO10 (MOSI), GPIO11 (SCLK) |
+| `enable_uart=1` (serial port) | GPIO14 (TXD), GPIO15 (RXD) |
+| `dtoverlay=w1-gpio` (1-Wire) | GPIO4 |
+
+Raspberry Pi kernels from the 6.18 series on (Pi 5 and older boards alike)
+refuse to hand such a pin out as a GPIO. The request fails with
+`Errno::EINVAL`, not `Errno::EBUSY`, and the message says which pin is taken:
+
+```
+Invalid argument - gpiod_chip_request_lines: GPIO2 is reserved by the kernel
+for another function (I2C, SPI, UART, 1-Wire, ...); ...
+```
+
+Older kernels let the request through, switch the pin to GPIO and silently
+break the bus instead. Either way, pick another pin: GPIO17, 27 and 22
+(physical pins 11, 13 and 15) are clear of all four functions above.
+
+To see who holds a pin, `gpioinfo` prints `consumer="kernel"` for one taken by
+a bus, `pinctrl get 2` shows the function it is set to, and `Chip#line_info`
+gives the same from Ruby:
+
+```ruby
+Rgpio::Chip.open { |chip| chip.line_info(2) }
+# => {offset: 2, used: true, consumer: nil}   # nil: held by the kernel, e.g. I2C
+```
+
 
 ## Software PWM
 
@@ -855,6 +889,7 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | `#label` | Controller label (`"pinctrl-rp1"`) |
 | `#num_lines` | Number of GPIO lines |
 | `#request_lines(...)` | Returns a `LineRequest` |
+| `#line_info(offset)` | `{offset:, used:, consumer:}` for one line; `consumer` is nil when free or held by the kernel |
 | `#close` | Close the chip |
 
 ### `Rgpio::LineRequest`

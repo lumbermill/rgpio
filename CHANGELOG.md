@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Chip#line_info(offset)` returns `{offset:, used:, consumer:}` for one GPIO
+  line, from libgpiod's line info.
+
+### Changed
+
+- A failed `Chip#request_lines` now says which pin is taken and by whom. A pin
+  held by I2C, SPI, UART or 1-Wire is refused by Raspberry Pi kernels from the
+  6.18 series with `Errno::EINVAL`, which on its own read like a bad argument;
+  the message now points at `config.txt` and `pinctrl get`. The exception class
+  is unchanged. Covered by unit tests; not yet checked on hardware.
+- The guide gains "Pins taken by another function", listing the pins each bus
+  takes.
+
 ## [0.1.1] - 2026-10-23
 
 New devices for the Pi 5 round: a rotary encoder, and an SPI colour TFT with

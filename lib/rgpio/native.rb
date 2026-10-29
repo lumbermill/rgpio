@@ -139,6 +139,18 @@ module Rgpio
       extern "size_t gpiod_chip_info_get_num_lines(void *info)"
 
       # -----------------------------------------------------------------------
+      # Line info — gpiod_line_info_*
+      # Used to explain a failed request (which line is taken, and by whom).
+      # -----------------------------------------------------------------------
+      extern "void *gpiod_chip_get_line_info(void *chip, unsigned int offset)"
+      extern "void gpiod_line_info_free(void *info)"
+      # The C return type is bool (1 byte); read it as unsigned char so no
+      # stray upper bits leak in. Converted to true/false by the wrapper below.
+      extern "unsigned char gpiod_line_info_is_used(void *info)"
+      # NULL when the line is free, or used by the kernel without a label.
+      extern "const char *gpiod_line_info_get_consumer(void *info)"
+
+      # -----------------------------------------------------------------------
       # Line settings — gpiod_line_settings_*
       # -----------------------------------------------------------------------
       extern "void *gpiod_line_settings_new(void)"
@@ -216,6 +228,7 @@ module Rgpio
         gpiod_api_version
         gpiod_chip_info_get_name
         gpiod_chip_info_get_label
+        gpiod_line_info_get_consumer
       ].freeze
 
       STRING_RETURNING.each do |meth|
@@ -232,6 +245,12 @@ module Rgpio
                            :gpiod_line_settings_set_active_low)
       singleton_class.send(:define_method, :gpiod_line_settings_set_active_low) do |settings, flag|
         gpiod_line_settings_set_active_low__int(settings, flag ? 1 : 0)
+      end
+
+      # Return a Ruby boolean for gpiod_line_info_is_used.
+      singleton_class.send(:alias_method, :gpiod_line_info_is_used__uchar, :gpiod_line_info_is_used)
+      singleton_class.send(:define_method, :gpiod_line_info_is_used) do |info|
+        gpiod_line_info_is_used__uchar(info) != 0
       end
     end
   end

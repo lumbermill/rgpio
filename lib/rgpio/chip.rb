@@ -182,7 +182,7 @@ module Rgpio
           req_config_ptr = build_request_config(consumer)
           begin
             request_ptr = Native.gpiod_chip_request_lines(@chip_ptr, req_config_ptr, line_config_ptr)
-            raise SystemCallError.new("gpiod_chip_request_lines", Native.errno) if request_ptr.null?
+            raise_request_failure!(offsets_arr) if request_ptr.null?
 
             LineRequest.new(request_ptr, offsets_arr)
           ensure
@@ -193,6 +193,47 @@ module Rgpio
         end
       ensure
         Native.gpiod_line_settings_free(settings_ptr)
+      end
+    end
+
+    # Who, if anyone, holds a GPIO line right now.
+    #
+    # A line can be used by another program or kernel driver that requested
+    # it as a GPIO (consumer is its label), or by the kernel for another pin
+    # function such as I2C or SPI (consumer is nil). The second case is what
+    # `gpioinfo` prints as consumer="kernel".
+    #
+    # @param offset [Integer] GPIO line offset (BCM numbering)
+    # @return [Hash] { offset:, used:, consumer: }
+    def line_info(offset)
+      assert_open!
+      info = Native.gpiod_chip_get_line_info(@chip_ptr, offset)
+      raise SystemCallError.new("gpiod_chip_get_line_info(#{offset})", Native.errno) if info.null?
+
+      begin
+        consumer = Native.gpiod_line_info_get_consumer(info)
+        consumer = nil if consumer && consumer.empty?
+        { offset: offset, used: Native.gpiod_line_info_is_used(info), consumer: consumer }
+      ensure
+        Native.gpiod_line_info_free(info)
+      end
+    end
+
+    # Explain why a line is unavailable, or nil when it looks free.
+    #
+    # @param info [Hash] a record as returned by {#line_info}
+    # @return [String, nil]
+    def self.busy_line_hint(info)
+      return nil unless info[:used]
+
+      gpio = info[:offset]
+      if info[:consumer]
+        "GPIO#{gpio} is already in use by #{info[:consumer].inspect}"
+      else
+        "GPIO#{gpio} is reserved by the kernel for another function " \
+          "(I2C, SPI, UART, 1-Wire, ...); check dtparam/dtoverlay in " \
+          "/boot/firmware/config.txt, and run `pinctrl get #{gpio}` to see " \
+          "the current function"
       end
     end
 
@@ -225,6 +266,28 @@ module Rgpio
       ensure
         Native.gpiod_chip_info_free(info)
       end
+    end
+
+    # Raise the kernel's errno for a failed gpiod_chip_request_lines, with a
+    # message naming any line that is already taken.
+    def raise_request_failure!(offsets)
+      # Save errno before the line-info lookups make more native calls.
+      errno = Native.errno
+      raise SystemCallError.new(request_failure_message(offsets), errno)
+    end
+
+    # Message for a failed gpiod_chip_request_lines, naming any line that is
+    # already taken. The kernel's errno alone is not enough: a pin claimed by
+    # I2C or SPI fails with EINVAL, not EBUSY.
+    def request_failure_message(offsets)
+      hints = offsets.uniq.filter_map do |offset|
+        self.class.busy_line_hint(line_info(offset))
+      rescue SystemCallError
+        nil # e.g. an offset past the end of the chip; keep the original error
+      end
+      return "gpiod_chip_request_lines" if hints.empty?
+
+      "gpiod_chip_request_lines: #{hints.join("; ")}"
     end
 
     def build_request_config(consumer)
