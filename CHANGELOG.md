@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   6.18 series with `Errno::EINVAL`, which on its own read like a bad argument;
   the message now points at `config.txt` and `pinctrl get`. The exception class
   is unchanged. The "already in use by" case is checked on Pi 5 by the loopback
-  tests; the kernel-function case is covered by unit tests only.
+  tests; the kernel-function case is verified on a Pi with I2C enabled.
 - The guide gains "Pins taken by another function", listing the pins each bus
   takes.
 

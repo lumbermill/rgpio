@@ -46,6 +46,11 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   ST7032 on an AQM0802 (8x2): both rows legible at the 3.3 V defaults
   (`contrast: 0x20`, booster on) with no adjustment needed, `move_to` addressing
   each row, and in-place overwrite. Verified 2026-09-27.
+- Pin held by I2C (`raspi25`, I2C enabled with `raspi-config nonint do_i2c 0`):
+  `RGBLED.new(red: 2, green: 3, blue: 4)` fails with `Errno::EINVAL` whose
+  message names GPIO2 as reserved by the kernel, and `Chip#line_info` reports
+  GPIO2 as `used: true, consumer: nil` and the free GPIO4 as `used: false`.
+  Verified 2026-10-29.
 - Pi 5 software PWM accuracy (`Rgpio::SoftwarePWM`, Trixie): measured with a
   jumper from GPIO23 to GPIO24 and the kernel's own edge timestamps
   (`examples/pwm_jitter.rb`; the generator runs in a forked process so it does
