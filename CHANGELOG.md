@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Chip#line_info(offset)` returns `{offset:, used:, consumer:}` for one GPIO
   line, from libgpiod's line info.
+- Loopback hardware tests (`rake integration`, with `RGPIO_LOOPBACK=<out>:<in>`
+  naming two jumpered pins). They cover input/output levels, bias,
+  `active_low`, batch I/O, edge events, line ownership and `LED` → `Button`
+  callbacks. Verified on Pi 5.
 
 ### Changed
 
@@ -18,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   held by I2C, SPI, UART or 1-Wire is refused by Raspberry Pi kernels from the
   6.18 series with `Errno::EINVAL`, which on its own read like a bad argument;
   the message now points at `config.txt` and `pinctrl get`. The exception class
-  is unchanged. Covered by unit tests; not yet checked on hardware.
+  is unchanged. The "already in use by" case is checked on Pi 5 by the loopback
+  tests; the kernel-function case is covered by unit tests only.
 - The guide gains "Pins taken by another function", listing the pins each bus
   takes.
 

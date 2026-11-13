@@ -414,9 +414,13 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
       lock is pinned to the aarch64 dev box). A `RuboCop` lint job runs alongside.
 - [x] RuboCop lint configuration — `.rubocop.yml` tuned to the project's style;
       the tree is clean. `rake` runs test + rubocop.
-- [ ] Integration tests for `LineRequest` / edge events (needs GPIO loopback
-      wiring; not runnable in CI). A manual Pi 5 smoke test already verified
-      batch `get_values`/`set_values`.
+- [x] Integration tests for `LineRequest` / edge events —
+      `test/integration/loopback_test.rb`, run with
+      `RGPIO_LOOPBACK=17:27 rake integration` (GPIO17 jumpered to GPIO27; every
+      test skips without the variable, and `rake test` / CI do not load it).
+      Passing on the dev Pi 5 (kernel 6.18). Finding: edges a few µs apart are
+      lost or mistyped by the kernel with `edge: :both`; ≥ 0.1 ms apart was
+      reliable.
 - [ ] Optional: RuboCop extensions (`rubocop-minitest`, `rubocop-rake`).
 - [x] `required_ruby_version` lowered to `>= 3.3` to match Trixie's default
       `ruby` (so `gem install rgpio` works on a stock Trixie box). Verified on
