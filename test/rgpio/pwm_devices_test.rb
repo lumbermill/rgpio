@@ -138,6 +138,59 @@ class PWMDevicesTest < Minitest::Test
     assert_raises(ArgumentError) { Rgpio::PWMLED.new(4, pwm: :magic) }
   end
 
+  # --- pwm: :auto ---------------------------------------------------------
+
+  KERNEL_HELD = { used: true, consumer: nil }.freeze
+  FREE = { used: false, consumer: nil }.freeze
+
+  def test_auto_uses_hardware_on_a_pin_the_overlay_has_claimed
+    [12, 13, 18, 19].each do |gpio|
+      assert_equal :hardware, Rgpio::PWMChannel.choose(gpio, KERNEL_HELD.merge(offset: gpio)), "GPIO#{gpio}"
+    end
+  end
+
+  def test_auto_uses_software_on_a_hardware_pin_without_the_overlay
+    assert_equal :software, Rgpio::PWMChannel.choose(12, FREE.merge(offset: 12)),
+                 "a free line is not connected to the PWM peripheral, even when a PWM chip exists"
+  end
+
+  def test_auto_uses_software_on_a_hardware_pin_another_program_holds
+    info = { offset: 18, used: true, consumer: "other-program" }
+
+    assert_equal :software, Rgpio::PWMChannel.choose(18, info),
+                 "held by a process, not routed by an overlay; software PWM then reports who has it"
+  end
+
+  def test_auto_uses_software_on_every_other_pin_whatever_its_state
+    [2, 4, 17].each do |gpio|
+      assert_equal :software, Rgpio::PWMChannel.choose(gpio, KERNEL_HELD.merge(offset: gpio)), "GPIO#{gpio}"
+      assert_equal :software, Rgpio::PWMChannel.choose(gpio, nil), "GPIO#{gpio}"
+    end
+  end
+
+  def test_auto_tries_hardware_when_the_line_cannot_be_looked_up
+    assert_equal :hardware, Rgpio::PWMChannel.choose(12, nil),
+                 "without libgpiod, software PWM cannot work either"
+  end
+
+  def test_the_fallback_warning_names_the_overlay_for_the_pin
+    assert_includes Rgpio::PWMChannel.fallback_warning(12), "dtoverlay=pwm,pin=12,func=4"
+    assert_includes Rgpio::PWMChannel.fallback_warning(19), "dtoverlay=pwm,pin=19,func=2"
+    assert_includes Rgpio::PWMChannel.fallback_warning(18), "pwm: :software"
+    assert_nil Rgpio::PWMChannel.fallback_warning(4), "a pin without hardware PWM has nothing to suggest"
+  end
+
+  def test_the_fallback_warning_is_printed_once_per_pin
+    Rgpio::PWMChannel.reset_warnings!
+
+    assert_output(nil, /GPIO18 supports hardware PWM/) { Rgpio::PWMChannel.warn_fallback(18) }
+    assert_output(nil, "") { Rgpio::PWMChannel.warn_fallback(18) }
+    assert_output(nil, /GPIO13/) { Rgpio::PWMChannel.warn_fallback(13) }
+    assert_output(nil, "") { Rgpio::PWMChannel.warn_fallback(4) }
+  ensure
+    Rgpio::PWMChannel.reset_warnings!
+  end
+
   # --- RGBLED -------------------------------------------------------------
 
   def rgb(**)

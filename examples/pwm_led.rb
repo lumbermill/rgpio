@@ -6,9 +6,9 @@
 #   GPIO4 (pin 7) -- 1k resistor -- LED anode (long leg)
 #   LED cathode (short leg) -- GND (pin 6)
 #
-# No dtoverlay and no config.txt entry: the brightness comes from
-# Rgpio::SoftwarePWM, which drives any line. On GPIO12/13/18/19 you can pass
-# pwm: :hardware instead for a peripheral-timed waveform.
+# No dtoverlay and no config.txt entry: on GPIO4 the brightness comes from
+# Rgpio::SoftwarePWM, which drives any line. On GPIO12/13/18/19 with a PWM
+# dtoverlay, the same code uses the hardware peripheral instead.
 #
 # Run:
 #   ruby examples/pwm_led.rb

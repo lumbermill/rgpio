@@ -2,11 +2,11 @@ module Rgpio
   # A GPIO line driven by a PWM channel, so it has a level between off and on
   # rather than just the two.
   #
-  # The channel is {SoftwarePWM} unless asked otherwise. It needs no dtoverlay
-  # and works on every line, where {HardwarePWM} needs a config.txt entry and
-  # reaches two header pins at a time — see PLAN.md for the measurements behind
-  # that default. Pass `pwm: :hardware` on GPIO12/13/18/19 to use the peripheral,
-  # or pass a channel object to share one.
+  # The channel is chosen from the pin (`pwm: :auto`): {HardwarePWM} on
+  # GPIO12/13/18/19 once a dtoverlay routes the pin to the PWM peripheral,
+  # {SoftwarePWM} on every other line, and on those four without the overlay
+  # (with a one-time warning). See {PWMChannel}. Pass `pwm: :software` or
+  # `pwm: :hardware` to force one, or a channel object to share one.
   class PWMOutputDevice
     include PWMChannel
 
@@ -19,12 +19,12 @@ module Rgpio
     # @param initial_value [Float] 0.0..1.0, applied before the channel starts
     # @param active_low    [Boolean] when true, 1.0 drives the line low — the
     #                      wiring of a common-anode LED
-    # @param pwm           [:software, :hardware, Object] channel to drive the
-    #                      line with, or one to borrow
+    # @param pwm           [:auto, :software, :hardware, Object] channel to
+    #                      drive the line with, or one to borrow
     # @param chip          [Chip, nil] chip to share, or nil to open one
     # @param consumer      [String] name shown in the kernel's request list
     def initialize(gpio, frequency: DEFAULT_FREQUENCY, initial_value: 0.0, active_low: false,
-                   pwm: :software, chip: nil, consumer: "rgpio")
+                   pwm: :auto, chip: nil, consumer: "rgpio")
       @gpio = gpio
       @active_low = active_low
       @closed = false

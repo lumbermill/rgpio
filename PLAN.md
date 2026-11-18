@@ -219,18 +219,28 @@ Python filenames, so they stand on their own for anyone reading the gem.
   move. A separate gem would buy independent release cycles — worth little for a
   single maintainer — at the cost of version-range bookkeeping and a two-gem
   install for the book's readers.
-- **Software PWM by default, hardware PWM opt-in** (revised 2026-09-27; this
-  reverses the earlier "hardware PWM only" decision). The constraint that
-  settled it: *the book's readers must not have to edit config.txt*, and hardware
-  PWM cannot be reached without a dtoverlay — on a Pi 5 the stock overlays route
-  at most **two** header pins (`pwm-2chan`: `pin` from 12/18, `pin2` from 13/19),
-  so an `RGBLED` could not work at all. `Rgpio::SoftwarePWM` needs no
-  configuration, drives any line, and — measured, see below — beats gpiozero on
-  its own ground, so the book keeps its GPIO2/3/4 wiring and no revision is
-  needed. `pwm: :hardware` stays available for anyone who can set the overlay.
-  What gpiozero does, for the record: everything goes through `lgpio.tx_pwm`,
-  which its own docs call "software timed PWM" — it never touches the kernel PWM
-  interface, which is why it needs no config.txt either.
+- **Low-level classes stay faithful; devices choose for the caller.** The
+  classes directly under `lib/rgpio/` (`Chip`, `HardwarePWM`, `SoftwarePWM`,
+  ...) wrap one kernel interface each and decide nothing on their own. The
+  device classes under `lib/rgpio/devices/` hide as much of that as they can.
+- **PWM devices pick the channel from the pin** (revised 2026-11-18, replacing
+  "software by default, hardware opt-in" of 2026-09-27). `pwm: :auto` is the
+  default: on GPIO12/13/18/19 a line the kernel holds — a `dtoverlay` has
+  routed it to the PWM peripheral — gets `HardwarePWM`, and a free line gets
+  `SoftwarePWM` with a one-time warning naming the overlay that would make it
+  hardware. Choosing one of those pins is taken as asking for hardware PWM.
+  The decision rests on the line, not on whether a PWM chip exists: with
+  `pwm-2chan` on 18/19, a request for GPIO12 finds the chip, exports channel 0
+  and outputs nothing on a Pi 5 — and on a Pi 4 / Zero, where 12 and 18 share
+  channel 0, drives GPIO18 instead. Each choice is also the only one that can
+  work: a line the kernel holds cannot be requested for software PWM, and a
+  free one is not connected to the peripheral. `pwm: :software` and
+  `pwm: :hardware` force one (`:software` also silences the warning). Software
+  PWM needs no configuration and drives any line, so every other pin, and
+  every pin without an overlay, keeps working — an `RGBLED` too, which needs
+  three lines where the stock overlays route at most two. What gpiozero does,
+  for the record: everything goes through `lgpio.tx_pwm`, which its own docs
+  call "software timed PWM" — it never touches the kernel PWM interface.
 - **Callbacks over blocks, dispatched from one watcher thread per device.**
   `button.when_pressed { ... }` rather than gpiozero's attribute assignment.
   The thread blocks in `read_edge_events` with a finite timeout so `#close` can
@@ -246,7 +256,7 @@ Python filenames, so they stand on their own for anyone reading the gem.
 | 3a″ | `RotaryEncoder` | ロータリーエンコーダー (new section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3f | `ILI9341` TFT + `XPT2046` touch over `SPI` | タッチパネル付きTFT液晶 (candidate section) | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3b | `Rgpio::I2C` + ADT7410 / ST7032 examples | 温度センサ, LCD | ✅ verified on Pi 5 — confirmed spec, see the guide |
-| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` (hardware opt-in) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
+| 3c | `Servo` / `PWMLED` / `RGBLED` over `SoftwarePWM` or `HardwarePWM` (`pwm: :auto`) | サーボ, フルカラーLED | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | 3d | `Rgpio::SPI` + `MCP3208` | ADコンバータ | ✅ verified on Pi 5 — confirmed spec, see the guide |
 | — | ~~Distance sensor class (Sharp GP2Y0A21YK0F)~~ | 測距センサ | ✂️ out of scope — an analog sensor read through `MCP3208`; the book thresholds `voltage` directly, so no gem class is needed |
 | — | ~~Camera examples shelling out to `rpicam-still`~~ | モーション+撮影 | ✂️ out of scope — not GPIO; `rpicam-still` needs no gem code |
@@ -376,7 +386,7 @@ I2C and SPI need no libgpiod: they are `ioctl` calls on `/dev/i2c-N` and
   with touch, as the graphic step after `ST7032`. Decisions taken:
   - **User-space SPI, not a kernel driver.** `dtoverlay=mipi-dbi-spi` / fbtft
     would make it a framebuffer or DRM device — a desktop target, but a
-    different way in from Ruby and a config.txt edit for readers. rgpio drives
+    different way in from Ruby, and one more dtoverlay to set up. rgpio drives
     it over spidev with D/C and RESET as GPIO outputs.
   - **`SPI#send_bytes`** (new) sends any length tx-only, in messages of
     `SPI.max_transfer_size` (spidev's `bufsiz`, 4096 by default), reusing one

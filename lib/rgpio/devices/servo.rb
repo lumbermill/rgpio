@@ -13,10 +13,12 @@ module Rgpio
   # its travel buzzes and heats up, so widen the range only as far as the part's
   # datasheet allows, and by measuring rather than by trusting.
   #
-  # Accuracy: the default {SoftwarePWM} channel places the pulse within about
-  # 6 us on an idle Pi 5, which is half a degree of travel; a busy machine can
-  # push an occasional pulse 30-80 us out (see PLAN.md). `pwm: :hardware` on
-  # GPIO12/13/18/19 removes that entirely, at the cost of a config.txt entry.
+  # Accuracy: on GPIO12/13/18/19 with the dtoverlay that routes the pin to the
+  # PWM peripheral, the pulses are timed by hardware and exact. Anywhere else
+  # the channel is {SoftwarePWM}, which places the pulse within about 6 us on an
+  # idle Pi 5 — half a degree of travel — and a busy machine can push an
+  # occasional pulse 30-80 us out (see PLAN.md). See {PWMChannel} for how the
+  # channel is chosen.
   class Servo
     include PWMChannel
 
@@ -35,12 +37,13 @@ module Rgpio
     # @param max_angle     [Numeric] angle reported at value +1.0
     # @param initial_value [Float, nil] -1.0..1.0 to start there, nil to start
     #                      detached (no pulses, so the horn is free)
-    # @param pwm           [:software, :hardware, Object] channel to drive with
+    # @param pwm           [:auto, :software, :hardware, Object] channel to
+    #                      drive with, or one to borrow
     # @param chip          [Chip, nil] chip to share, or nil to open one
     # @param consumer      [String] name shown in the kernel's request list
     def initialize(gpio, min_pulse_us: DEFAULT_MIN_PULSE_US, max_pulse_us: DEFAULT_MAX_PULSE_US,
                    frequency: DEFAULT_FREQUENCY, min_angle: -90, max_angle: 90,
-                   initial_value: 0.0, pwm: :software, chip: nil, consumer: "rgpio")
+                   initial_value: 0.0, pwm: :auto, chip: nil, consumer: "rgpio")
       raise ArgumentError, "max_pulse_us must exceed min_pulse_us" unless max_pulse_us > min_pulse_us
 
       @gpio = gpio

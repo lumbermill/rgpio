@@ -12,8 +12,9 @@
 #
 # No dtoverlay and no config.txt entry: the pulses come from Rgpio::SoftwarePWM,
 # which measured 6 us of spread at this frame rate on an idle Pi 5 — about half a
-# degree. On GPIO12/13/18/19 you can pass pwm: :hardware for a peripheral-timed
-# pulse instead. examples/lowlevel/servo.rb drives the peripheral directly.
+# degree. On GPIO12/13/18/19 with a PWM dtoverlay, the same code gets
+# peripheral-timed pulses instead (see examples/servo_with_hw.rb).
+# examples/lowlevel/servo.rb drives the peripheral directly.
 #
 # Pulse widths vary by servo. 1000..2000 us is the range every hobby servo
 # understands; widen it only as far as the datasheet allows, since a servo driven

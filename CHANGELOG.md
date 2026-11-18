@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `PWMLED`, `RGBLED` and `Servo` default to `pwm: :auto`, which picks the
+  channel from the pin: `HardwarePWM` on GPIO12/13/18/19 when a dtoverlay has
+  routed the pin to the PWM peripheral (the kernel holds the line), and
+  `SoftwarePWM` otherwise. A hardware-capable pin left on software PWM prints
+  a one-time warning with the overlay line; `pwm: :software` forces software
+  PWM and silences it, `pwm: :hardware` still forces the peripheral. The check
+  is on the line, not on whether a PWM chip exists, because an overlay for
+  other pins still creates the chip. Code that ran before keeps running: a pin
+  routed to PWM could not be requested for software PWM anyway.
 - On a single-core board (Pi Zero / Pi 1) `SoftwarePWM` generates the waveform
   in a forked child process (`process: :auto`; `true` / `false` to choose).
   The child disables the garbage collector and collects only inside the low

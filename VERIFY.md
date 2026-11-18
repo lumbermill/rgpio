@@ -410,3 +410,53 @@ ruby examples/adc_led.rb
   が返る**ので、疑うのはまずここ）
 - `Errno::EACCES` → `sudo usermod -aG spi $USER` して入り直す
 - 値が反転している → 可変抵抗の 3.3V と GND が逆
+
+---
+
+# `pwm: :auto` 実機チェックリスト
+
+Pi 5 と Pi Zero W で上から順に。配線: `GPIO12(32番ピン)` → 1kΩ → LED長足 / 短足 → `GND`。
+dtoverlay は再起動なしの `sudo dtoverlay` で切り替える（再起動すると元に戻る）。
+
+```bash
+cd ~/sources/rgpio && git pull
+AUTO='l = Rgpio::PWMLED.new(12, initial_value: 0.3); p l.pwm.class; sleep 3; l.close'
+```
+
+## 1. overlay なし → ソフトウェア PWM と警告
+
+```bash
+sudo dtoverlay -r pwm 2>/dev/null; sudo dtoverlay -r pwm-2chan 2>/dev/null
+ruby -Ilib -rrgpio -e "$AUTO"
+```
+
+- [ ] `Rgpio::SoftwarePWM` と出て、LED が 3 秒うす暗く点く
+- [ ] stderr に `GPIO12 supports hardware PWM ... dtoverlay=pwm,pin=12,func=4` が 1 回だけ出る
+- [ ] `pwm: :software` を付けると警告が消える:
+      `ruby -Ilib -rrgpio -e 'l = Rgpio::PWMLED.new(12, pwm: :software); sleep 1; l.close'`
+
+## 2. GPIO12 の overlay あり → ハードウェア PWM
+
+```bash
+sudo dtoverlay pwm pin=12 func=4
+ruby -Ilib -rrgpio -e 'Rgpio::Chip.open { |c| p c.line_info(12) }'
+ruby -Ilib -rrgpio -e "$AUTO"
+```
+
+- [ ] `line_info` が `used: true, consumer: nil`（ここが違うと判定の前提が崩れる。結果を控える）
+- [ ] `Rgpio::HardwarePWM` と出て、警告なしで LED が点く
+
+## 3. 別ピン（GPIO18）の overlay → GPIO12 はソフトウェアのまま
+
+```bash
+sudo dtoverlay -r pwm; sudo dtoverlay pwm pin=18 func=2
+ruby -Ilib -rrgpio -e "$AUTO"
+```
+
+- [ ] `Rgpio::SoftwarePWM` と警告が出て、GPIO12 の LED が点く（PWM チップはあるがハードウェアを選ばない）
+- [ ] 後片付け: `sudo dtoverlay -r pwm`
+
+## 全部 ✅ になったら
+
+- [ ] PLAN.md の 3c 行に「`pwm: :auto` verified on Pi 5 / Pi Zero W」を追記
+- [ ] コミット

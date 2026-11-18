@@ -35,13 +35,16 @@ module Rgpio
     # @param active_low [Boolean] true for a common-anode LED
     # @param balance    [Array<Float>] per-channel scale, 0.0..1.0 each, applied
     #                   on top of every level asked for
-    # @param pwm        [:software, :hardware, Hash] channel kind, or a
-    #                   {red:, green:, blue:} hash of channels to borrow
+    # @param pwm        [:auto, :software, :hardware, Hash] channel kind for
+    #                   all three, or a {red:, green:, blue:} hash of channels
+    #                   (or kinds) per colour
     # @param chip       [Chip, nil] chip to share, or nil to open one
     # @param consumer   [String] name shown in the kernel's request list
     def initialize(red:, green:, blue:, frequency: PWMOutputDevice::DEFAULT_FREQUENCY,
-                   active_low: false, balance: [1.0, 1.0, 1.0], pwm: :software, chip: nil, consumer: "rgpio")
-      @owns_chip = chip.nil? && pwm == :software
+                   active_low: false, balance: [1.0, 1.0, 1.0], pwm: :auto, chip: nil, consumer: "rgpio")
+      # Software PWM, and :auto's look at each line, need a chip; one is shared
+      # across the three colours rather than opened per channel.
+      @owns_chip = chip.nil? && %i[auto software].include?(pwm)
       @chip = @owns_chip ? Chip.new : chip
       @closed = false
       @balance = validate_triple(balance, "balance")

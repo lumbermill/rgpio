@@ -146,8 +146,10 @@ led.close
 ```
 
 The level holds with no further calls — one assignment, and the channel keeps
-generating. Any line works: the default channel is {Rgpio::SoftwarePWM}, which
-needs no dtoverlay. See [Software PWM](#software-pwm) for `pwm: :hardware`.
+generating. Any line works. The channel is chosen from the pin: GPIO12/13/18/19
+use the hardware PWM peripheral once a dtoverlay routes them to it, and every
+other line uses software PWM, which needs no configuration. See
+[Choosing the channel](#choosing-the-channel).
 
 ### RGBLED
 
@@ -344,8 +346,8 @@ Rgpio::Chip.open { |chip| chip.line_info(2) }
 ## Software PWM
 
 `Rgpio::SoftwarePWM` generates PWM in Ruby on any GPIO line. It needs no
-dtoverlay and no config.txt entry, which is why the device classes above use it
-by default.
+dtoverlay and no config.txt entry, which is why the device classes above fall
+back to it on any line the hardware peripheral cannot drive.
 
 ```ruby
 Rgpio::SoftwarePWM.open(18) do |pwm|
@@ -359,10 +361,49 @@ end
 
 It presents the same interface as `HardwarePWM` — `frequency=`, `duty_cycle=`,
 `pulse_width_us=`, `enable`/`disable`, `close` — so the device classes take
-either. Pass `pwm: :hardware` on GPIO12/13/18/19 for the peripheral instead:
+either.
+
+### Choosing the channel
+
+`PWMLED`, `RGBLED` and `Servo` take `pwm:`, and the default `:auto` picks the
+channel from the pin:
+
+| Pin | dtoverlay routes it to PWM | Channel |
+|---|---|---|
+| GPIO12/13/18/19 | yes | `HardwarePWM` |
+| GPIO12/13/18/19 | no | `SoftwarePWM`, with a warning naming the overlay line |
+| any other | — | `SoftwarePWM` |
+
+Choosing one of the four pins is taken as asking for hardware PWM, so wiring a
+servo to GPIO12 and adding the overlay is all it takes:
 
 ```ruby
-servo = Rgpio::Servo.new(12, pwm: :hardware)   # needs the dtoverlay, see below
+servo = Rgpio::Servo.new(12)                   # hardware PWM, if the overlay is loaded
+servo.pwm.class                                # => Rgpio::HardwarePWM
+```
+
+Without the overlay the same line runs on software PWM and prints, once per pin:
+
+```
+rgpio: GPIO12 supports hardware PWM, but no dtoverlay routes it to the PWM
+peripheral, so software PWM is used. For jitter-free output add
+`dtoverlay=pwm,pin=12,func=4` to /boot/firmware/config.txt and reboot (...);
+pass pwm: :software to silence this.
+```
+
+`:auto` asks whether the line itself is routed, not whether a PWM chip exists.
+A chip appears as soon as any PWM overlay is loaded, but only the pins the
+overlay names reach it: with `pwm-2chan` on GPIO18/19, opening GPIO12 as
+hardware PWM succeeds and outputs nothing on a Pi 5, and on a Pi 4 or Pi Zero
+(where GPIO12 and 18 share channel 0) drives GPIO18 instead. A routed pin is
+held by the kernel — `Chip#line_info` reports it used with no consumer — and
+that is what `:auto` checks.
+
+To force one, pass it:
+
+```ruby
+servo = Rgpio::Servo.new(12, pwm: :hardware)   # raise if the overlay is missing
+led   = Rgpio::PWMLED.new(18, pwm: :software)  # software PWM, no warning
 led   = Rgpio::PWMLED.new(13, pwm: channel)    # or share a channel you own
 ```
 
@@ -391,9 +432,9 @@ GIL, and gpiozero's PWM is software-timed too.
 
 > **A servo trembles slightly on a Pi Zero.** It holds its position and sweeps
 > smoothly, but a stray long pulse now and then shows as a small shake. For a
-> servo that must stand perfectly still, use hardware PWM
-> (`Rgpio::Servo.new(12, pwm: :hardware)`, after adding the
-> [config.txt line for the Pi Zero](#pi-zero--zero-w--pi-1)) or a dedicated
+> servo that must stand perfectly still, use hardware PWM (wire it to GPIO12
+> and add the [config.txt line for the Pi Zero](#pi-zero--zero-w--pi-1);
+> `Rgpio::Servo.new(12)` then picks the peripheral) or a dedicated
 > servo driver board. An LED is unaffected: one long pulse is invisible.
 
 Ruby's garbage collector stops every thread for 3 ms (minor) to 40 ms (major)
