@@ -1187,7 +1187,7 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 | Method | Description |
 |---|---|
-| `.new(red:, green:, blue:, frequency:, active_low:, balance:, pwm:, chip:, consumer:)` | Three channels as one device |
+| `.new(red:, green:, blue:, frequency:, active_low:, balance:, pwm:, chip:, consumer:)` | Three channels as one device; `pwm:` is one kind for all, or a hash by colour (colours left out get `:auto`) |
 | `#color` / `#color=` | An r,g,b triple, or a name from `COLORS` |
 | `#red` / `#green` / `#blue` (and `=`) | One channel at a time |
 | `#balance` / `#balance=` | Per-channel scale under every level asked for |

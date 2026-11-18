@@ -301,6 +301,22 @@ class PWMDevicesTest < Minitest::Test
     assert_equal [0.0, 0.75, 1.0], led.color
   end
 
+  def test_a_colour_left_out_of_the_pwm_hash_gets_auto
+    led = rgb
+    kinds = led.send(:channel_kinds, { red: :hardware }, %i[red green blue])
+
+    assert_equal({ red: :hardware, green: :auto, blue: :auto }, kinds)
+    assert_equal({ red: :software, green: :software, blue: :software },
+                 led.send(:channel_kinds, :software, %i[red green blue]))
+  end
+
+  def test_rejects_an_unknown_colour_in_the_pwm_hash
+    error = assert_raises(ArgumentError) do
+      Rgpio::RGBLED.new(red: 2, green: 3, blue: 4, pwm: { r: FakePWM.new })
+    end
+    assert_includes error.message, ":r"
+  end
+
   def test_closing_stops_every_channel
     led = rgb
     led.close

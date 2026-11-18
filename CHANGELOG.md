@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `RGBLED`'s `pwm:` hash may name only some colours; the rest get `:auto`
+  instead of failing. A key other than `:red`, `:green` or `:blue` raises
+  `ArgumentError`.
 - `HardwarePWM` behaves like `SoftwarePWM` where the device layer sees both:
   `duty_cycle=` raises `ArgumentError` outside 0.0..1.0 instead of clamping,
   `pulse_width_us=` raises when negative or longer than the period, and

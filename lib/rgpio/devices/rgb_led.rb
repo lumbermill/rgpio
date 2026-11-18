@@ -36,27 +36,25 @@ module Rgpio
     # @param balance    [Array<Float>] per-channel scale, 0.0..1.0 each, applied
     #                   on top of every level asked for
     # @param pwm        [:auto, :software, :hardware, Hash] channel kind for
-    #                   all three, or a {red:, green:, blue:} hash of channels
-    #                   (or kinds) per colour
+    #                   all three, or a hash of channels (or kinds) by colour;
+    #                   a colour the hash leaves out gets :auto
     # @param chip       [Chip, nil] chip to share, or nil to open one
     # @param consumer   [String] name shown in the kernel's request list
     def initialize(red:, green:, blue:, frequency: PWMOutputDevice::DEFAULT_FREQUENCY,
                    active_low: false, balance: [1.0, 1.0, 1.0], pwm: :auto, chip: nil, consumer: "rgpio")
+      lines = { red: red, green: green, blue: blue }
+      kinds = channel_kinds(pwm, lines.keys)
       # Software PWM, and :auto's look at each line, need a chip; one is shared
       # across the three colours rather than opened per channel.
-      @owns_chip = chip.nil? && %i[auto software].include?(pwm)
+      @owns_chip = chip.nil? && kinds.values.intersect?(%i[auto software])
       @chip = @owns_chip ? Chip.new : chip
       @closed = false
       @balance = validate_triple(balance, "balance")
       @color = [0.0, 0.0, 0.0]
-      lines = { red: red, green: green, blue: blue }
-      # One channel per colour: handing the same channel object to all three
-      # would have them overwrite each other's duty cycle.
-      channels = pwm.is_a?(Hash) ? pwm : {}
       @channels = lines.to_h do |colour, gpio|
         channel = PWMLED.new(gpio,
                              frequency: frequency, active_low: active_low,
-                             pwm: channels.fetch(colour, pwm), chip: @chip, consumer: consumer)
+                             pwm: kinds[colour], chip: @chip, consumer: consumer)
         [colour, channel]
       end
     end
@@ -158,6 +156,18 @@ module Rgpio
       @channels.values.each_with_index do |channel, i|
         channel.value = @color[i] * @balance[i]
       end
+    end
+
+    # The `pwm:` for each colour. A symbol applies to all three; a hash names
+    # some, and the rest get :auto. One channel object is never handed to
+    # all three, since they would overwrite each other's duty cycle.
+    def channel_kinds(pwm, colours)
+      return colours.to_h { |colour| [colour, pwm] } unless pwm.is_a?(Hash)
+
+      unknown = pwm.keys - colours
+      raise ArgumentError, "pwm: keys must be #{colours.inspect}, got #{unknown.inspect}" unless unknown.empty?
+
+      colours.to_h { |colour| [colour, pwm.fetch(colour, :auto)] }
     end
 
     def validate_triple(triple, what)
