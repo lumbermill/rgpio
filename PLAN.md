@@ -125,13 +125,14 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   (`examples/lcd_thermometer.rb`, read by eye) on one bus, so the 32-bit
   `i2c_msg` / `I2C_RDWR` packing carries real data. An address nobody
   acknowledges gives `Errno::EIO` from write and read, and `EIO` or
-  `EREMOTEIO` from `write_read` (Pi 5: always `EREMOTEIO`). Caveat: both
-  modules had just survived a reversed-supply mistake, so treat accuracy
-  figures from these two parts as suspect. Open question from the same run: a
-  plain `read` after a separate `write([reg])` always returned register 0x00
-  of the ADT7410, while `write_read` returned the pointed register — chip
-  behaviour or damage, to be checked with a healthy part on a Pi 5. The driver
-  uses `write_read`, so it is unaffected. Verified 2026-11-18.
+  `EREMOTEIO` from `write_read` (Pi 5: always `EREMOTEIO`). A plain `read`
+  after a separate `write([reg])` always returns the ADT7410's register 0x00
+  (temperature), while `write_read` returns the pointed register (0x0b → 0xcb,
+  0x04 → 0x20 0x00). A fresh ADT7410 did exactly the same as one that had
+  just survived a reversed supply, so it is not damage; whether the chip or
+  the bcm2835 controller is responsible is still open (try the same on a
+  Pi 5). The driver uses `write_read`, so it is unaffected. Verified
+  2026-11-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
