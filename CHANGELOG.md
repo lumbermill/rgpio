@@ -14,10 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Loopback hardware tests (`rake integration`, with `RGPIO_LOOPBACK=<out>:<in>`
   naming two jumpered pins). They cover input/output levels, bias,
   `active_low`, batch I/O, edge events, line ownership and `LED` → `Button`
-  callbacks. Verified on Pi 5.
+  callbacks. Verified on Pi 5 and on a Pi Zero W (ARMv6).
 
 ### Changed
 
+- `LineRequest#get_value` / `#set_value` / `#get_values` / `#set_values` issue
+  `GPIO_V2_LINE_GET_VALUES` / `SET_VALUES` with `IO#ioctl` on the request's file
+  descriptor instead of calling libgpiod's value functions through fiddle. A
+  fiddle call costs ~90 us on an ARMv6 Pi Zero, so `set_value` went from 158 us
+  to 35 us there (3.9 us to 1.35 us on a Pi 5), and `set_value` allocates
+  nothing. `SoftwarePWM`'s constant pulse offset on a Pi Zero halved
+  (+62 us to +30 us at 50 Hz). An offset outside the request now raises
+  `Errno::EINVAL` naming the request's offsets; the exception stays a
+  `SystemCallError`, as before.
+- `I2C` / `SPI` pack an all-integer byte list with one `pack` instead of one
+  String per byte: a 4096-byte `SPI#transfer` of an Array went from 100 ms to
+  29 ms on a Pi Zero. Results are unchanged, except that an empty list now
+  packs to a binary rather than a US-ASCII empty string.
+- The guide no longer promises `Errno::EREMOTEIO` for an I2C address nobody
+  acknowledges: a Pi Zero's controller reports `Errno::EIO`.
+- `examples/pwm_jitter.rb` drops its own priority to nice 19 while measuring,
+  so on a single-core board it no longer steals the core from the generator.
 - A failed `Chip#request_lines` now says which pin is taken and by whom. A pin
   held by I2C, SPI, UART or 1-Wire is refused by Raspberry Pi kernels from the
   6.18 series with `Errno::EINVAL`, which on its own read like a bad argument;

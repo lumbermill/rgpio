@@ -16,6 +16,12 @@
 # HardwarePWM wired from GPIO12):
 #   ruby examples/pwm_jitter.rb --external --seconds 5
 #
+# On a single-core board (Pi Zero / Pi 1) the measuring process still shares
+# the one core with the generator, so it lowers its own priority to nice 19
+# before measuring; otherwise its own wake-up on every edge lands inside the
+# pulses it is timing. On a Pi Zero that took the spread from 200-600 us down
+# to what the generator itself does.
+#
 # What the numbers mean: `pulse` is the high time a servo reads as its position
 # (1 us is about 0.09 degrees on a 180-degree servo), `period` is the frame
 # rate. Spread matters more than the mean — a mean that is 3 us off is a fixed
@@ -71,6 +77,7 @@ end
 
 # Collect edge events for `seconds`, then report pulse widths and periods.
 def measure(gpio, seconds, target_period_us, target_pulse_us)
+  Process.setpriority(Process::PRIO_PROCESS, 0, 19) # yield the core to the generator
   events = []
   Rgpio::Chip.open do |chip|
     request = chip.request_lines(offsets: [gpio], direction: :input, edge: :both,

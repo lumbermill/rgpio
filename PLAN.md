@@ -10,7 +10,7 @@ anything here is subject to change.
 | Phase | Scope | Status |
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
-| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero **still pending** |
+| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero W GPIO verified (I2C / SPI / devices pending) |
 | **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d and 3f verified on Pi 5 (`MotionSensor` deferred; camera and distance-sensor class dropped) |
 
 ## Multi-board support — validation status
@@ -100,22 +100,48 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   is clipped and its mean must fall short. A potentiometer's wiper is a
   high-impedance source and reads noisier than a rail: 27 LSB against 7.
   Verified 2026-09-29.
+- Pi Zero W GPIO (Rev 1.1, ARMv6, Trixie, kernel 6.18, libgpiod 2.2.1, Ruby
+  3.3.7 — `raspi27.local`): header auto-detect → `gpiochip0 [pinctrl-bcm2835]`
+  (54 lines; listed twice, as on Pi 4), unit suite green, and the loopback
+  tests (`RGPIO_LOOPBACK=23:24`) 14/14 on every run (seven before the ioctl
+  change, three after). Bit order of the value
+  ioctls checked against `pinctrl get` with a request in non-sorted order
+  (27, 22, 17), and `active_low` applied by the kernel. Verified 2026-11-18.
+- Pi Zero W `SoftwarePWM` (same board, 50 Hz / 1500 us, observed with
+  `gpiomon` at nice 19): median pulse +30 us, but GC pauses (minor 3 ms, major
+  40 ms on this CPU) put several-millisecond outliers in every 5 s run; with
+  `chrt -f 50` and `GC.disable` the spread is 5-6 us with ~1 isolated 1 ms
+  outlier per run, cause unknown. Costs on this board: `clock_gettime` 15 us,
+  a fiddle call ~90 us, `set_value` 35 us (158 us before the ioctl change). 32-bit
+  Ruby has no flonum, so the PWM loop allocates ~28 objects per cycle (6 on Pi
+  5). 1 kHz takes 55% of the core. Measured 2026-11-18.
+- Pi Zero W SPI bus layer (`/dev/spidev0.0`, MOSI-to-MISO jumper, pin 19 to
+  pin 21): a six-byte pattern, 64 bytes, one byte and a String came back
+  identical at 100 kHz, 1, 4, 16 and 32 MHz in all four modes, and a
+  4096-byte (spidev `bufsiz`) transfer at 8 MHz; the 32-bit build packs the
+  `spi_ioc_transfer` correctly. I2C bus layer only partly: with nothing on the
+  bus, write, read and `I2C_RDWR` all reach the controller and come back
+  `Errno::EIO` (Pi 5: `EREMOTEIO`) rather than `EFAULT` / `EINVAL`, so the
+  structs are accepted; no data has crossed it yet. Verified 2026-11-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
 
 **Not yet validated on real hardware:**
 
-- Pi Zero / Zero W / Zero 2 W / Pi 1 (`pinctrl-bcm2835`), including ARMv6 fiddle
-  behaviour under load. The `i2c_msg` struct layout is 32-bit-aware (the buffer
-  pointer sits at offset 8 either way) but has only been exercised on aarch64.
+- Pi Zero W I2C data transfer and the device classes; Pi Zero 2 W and Pi 1. The
+  `i2c_msg` struct layout is 32-bit-aware (the buffer pointer sits at offset 8
+  either way) but has only been exercised on aarch64.
+- Whether `SoftwarePWM` on a Pi Zero should reduce its own garbage (the
+  `clock_gettime` Floats in the spin loop); GC from the user's program would
+  remain either way.
 - `Rgpio::ST7032` on a 16-column AQM1602, and on a 5 V module (`booster: false`);
   only the 8x2 AQM0802 at 3.3 V has been on the bus.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is
   unit-tested against the datasheet's codes but has never come off real silicon.
 - `MotionSensor` — deferred, see Phase 3 below.
 
-Until validated, treat GPIO (libgpiod) on Pi Zero / Pi 1 as best-effort.
+Until validated, treat Pi 1, Pi Zero 2 W, and buses on the Pi Zero W as best-effort.
 
 ## Planned API additions (current gem)
 

@@ -52,6 +52,37 @@ class LineRequestTest < Minitest::Test
     assert_raises(Rgpio::Error) { req.set_values(17 => :active) }
   end
 
+  # --- value ioctls: numbers and struct gpio_v2_line_values --------- #
+
+  # The literals are GPIO_V2_LINE_GET_VALUES_IOCTL / _SET_VALUES_IOCTL as
+  # <linux/gpio.h> expands them.
+  def test_value_ioctl_numbers_match_linux_gpio_h
+    assert_equal 0xC010B40E, Rgpio::LineRequest::GET_VALUES_IOCTL
+    assert_equal 0xC010B40F, Rgpio::LineRequest::SET_VALUES_IOCTL
+  end
+
+  def test_line_values_are_two_u64_plus_a_sentinel_byte
+    buffer = Rgpio::LineRequest.pack_line_values(0b101, 0b111)
+    assert_equal 17, buffer.bytesize
+    assert_equal [0b101, 0b111], buffer.unpack("QQ")
+    refute_predicate buffer, :frozen?
+  end
+
+  # Bit 63 is the 64th line of a request, the kernel maximum.
+  def test_line_values_carry_the_high_bits
+    buffer = Rgpio::LineRequest.pack_line_values(1 << 63, (1 << 64) - 1)
+    assert_equal 1 << 63, Rgpio::LineRequest.unpack_line_bits(buffer)
+  end
+
+  def test_unknown_offset_is_einval_naming_the_request
+    req = Rgpio::LineRequest.new(Fiddle::NULL, [17, 27])
+    error = assert_raises(Errno::EINVAL) { req.set_value(22, :active) }
+    assert_match(/GPIO22 is not in this request \(offsets: 17, 27\)/, error.message)
+    assert_raises(Errno::EINVAL) { req.get_value(22) }
+    assert_raises(Errno::EINVAL) { req.get_values([17, 22]) }
+    assert_raises(Errno::EINVAL) { req.set_values(22 => :active) }
+  end
+
   def test_offsets_is_frozen_and_readable
     req = Rgpio::LineRequest.new(Fiddle::NULL, [17, 27])
     assert_equal [17, 27], req.offsets

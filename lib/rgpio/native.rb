@@ -185,6 +185,12 @@ module Rgpio
       # -----------------------------------------------------------------------
       extern "void *gpiod_chip_request_lines(void *chip, void *req_cfg, void *line_cfg)"
       extern "void gpiod_line_request_release(void *request)"
+      # The request's file descriptor (owned by libgpiod; closed on release).
+      # LineRequest issues the value ioctls on it directly — see there.
+      extern "int gpiod_line_request_get_fd(void *request)"
+      # Offsets in the order the kernel indexes them in value bitmaps.
+      extern "size_t gpiod_line_request_get_num_requested_lines(void *request)"
+      extern "size_t gpiod_line_request_get_requested_offsets(void *request, void *offsets, size_t max_offsets)"
       # Returns LINE_VALUE_ACTIVE / LINE_VALUE_INACTIVE / LINE_VALUE_ERROR
       extern "int gpiod_line_request_get_value(void *request, unsigned int offset)"
       # Returns 0 on success, -1 on error

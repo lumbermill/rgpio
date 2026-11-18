@@ -387,6 +387,16 @@ degree of travel. A busy machine widens that: while the main thread holds the
 GVL, the generating thread cannot wake. Python has the same limitation with the
 GIL, and gpiozero's PWM is software-timed too.
 
+A Pi Zero (single-core ARMv6) is a different machine. Measured the same way at
+50 Hz / 1500 us, the median pulse sits 30 us long and is steady, but Ruby's
+garbage collector stops every thread for 3 ms (minor) to 40 ms (major) there, and
+a pulse caught by one comes out several milliseconds long — 32-bit Ruby boxes
+every Float, so even an idle program produces garbage. Under `chrt -f` with
+`GC.disable` the spread drops to 5 us, so the cause is the collector, not the
+code. On a Zero, software PWM suits an LED, where one long pulse is invisible; a
+servo will twitch now and then. Frequencies above about 200 Hz cost a large share
+of the one core.
+
 
 ## Hardware PWM Usage
 
@@ -564,8 +574,10 @@ byte and a payload can go out in one transaction:
 i2c.write(0x40, "Hello")     # => 6
 ```
 
-Failures surface as the kernel's own `Errno` exceptions: `Errno::EREMOTEIO`
-when nothing acknowledges the address, `Errno::EBUSY` when a kernel driver
+Failures surface as the kernel's own `Errno` exceptions. When nothing
+acknowledges the address the class depends on the I2C controller:
+`Errno::EREMOTEIO` on a Pi 5, `Errno::EIO` on a Pi Zero's bcm2835 — rescue
+`SystemCallError` if the code must run on both. `Errno::EBUSY` when a kernel driver
 already holds it (pass `force: true` to claim it anyway), `Errno::EACCES` when
 the user is not in the `i2c` group.
 
