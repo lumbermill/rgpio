@@ -1,3 +1,5 @@
+require "etc"
+
 module Rgpio
   # PWM generated in Ruby on any GPIO line, for the pins the hardware PWM
   # peripheral cannot reach.
@@ -26,6 +28,17 @@ module Rgpio
   # Nothing can fix the other direction: while the main thread holds the GVL in
   # a long computation, this thread cannot wake at all. Python has the same
   # limitation with the GIL.
+  #
+  # On a single-core board (Pi Zero / Pi 1) the waveform is generated in a
+  # forked child process instead (`process: :auto`). There a garbage collection
+  # stops every thread for 3 to 40 ms, and 32-bit Ruby boxes every Float, so
+  # even an idle program collects: each pause put a pulse several milliseconds
+  # long on the line, which a servo shows as a twitch. The child runs with GC
+  # disabled and collects only right after a falling edge, inside the low
+  # phase, and the parent's collections can only delay it as long as the
+  # kernel lets them, never stop it. The parent sends settings down a pipe;
+  # when the parent exits, however it exits, the child sees the pipe close,
+  # leaves the line inactive and exits too.
   class SoftwarePWM
     # gpiozero's default for PWMLED, and fast enough that an LED does not
     # visibly flicker.
@@ -48,6 +61,23 @@ module Rgpio
     # trusting it.
     FREQUENCY_RANGE = (0.1..10_000)
 
+    # The child collects once fewer than this many object slots are free. Its
+    # loop allocates a few dozen objects a cycle on 32-bit Ruby, so this comes
+    # round every second or so at 50 Hz.
+    CHILD_GC_FREE_SLOTS = 1_000
+
+    # One settings message to the child: [running, frequency, duty] as doubles.
+    # 24 bytes, well under PIPE_BUF, so each write arrives whole.
+    RECORD_FORMAT = "EEE".freeze
+    RECORD_SIZE = 24
+
+    include ProcessMode
+
+    # @return [Boolean] whether this machine has a single CPU core
+    def self.single_core?
+      Etc.nprocessors == 1
+    end
+
     # Open a channel, yield it, then close it.
     # @return [SoftwarePWM, Object] the channel, or the block's value
     def self.open(gpio, **)
@@ -67,8 +97,10 @@ module Rgpio
     # @param spin_us    [Integer] microseconds to spin before each edge
     # @param chip       [Chip, nil] chip to share, or nil to open one
     # @param consumer   [String] name shown in the kernel's request list
+    # @param process    [:auto, Boolean] generate in a forked child process;
+    #                   :auto does so on a single-core board only
     def initialize(gpio, frequency: DEFAULT_FREQUENCY, duty_cycle: 0.0, spin_us: DEFAULT_SPIN_US,
-                   chip: nil, consumer: "rgpio")
+                   chip: nil, consumer: "rgpio", process: :auto)
       @gpio = gpio
       @spin = validate_spin(spin_us) / 1_000_000.0
       @mutex = Mutex.new
@@ -76,14 +108,14 @@ module Rgpio
       @duty = validate_duty(duty_cycle)
       @running = false
       @closed = false
-      @owns_chip = chip.nil?
-      @chip = chip || Chip.new
-      @request = @chip.request_lines(
-        offsets: [gpio],
-        direction: :output,
-        initial_value: :inactive,
-        consumer: consumer
-      )
+      @process = resolve_process(process)
+      if @process
+        start_child(chip, consumer)
+      else
+        @owns_chip = chip.nil?
+        @chip = chip || Chip.new
+        @request = request_line(@chip, consumer)
+      end
     end
 
     # @return [Integer] the GPIO line this channel drives
@@ -100,6 +132,11 @@ module Rgpio
     # Alias for parity with {HardwarePWM}, which calls it duty_ratio.
     alias duty_ratio duty_cycle
 
+    # @return [Boolean] whether a child process generates the waveform
+    def process?
+      @process
+    end
+
     # @return [Integer] microseconds spent spinning before each edge
     def spin_us
       (@spin * 1_000_000).round
@@ -108,12 +145,14 @@ module Rgpio
     def frequency=(hz)
       hz = validate_frequency(hz)
       @mutex.synchronize { @frequency = hz }
+      send_settings if @process
       hz
     end
 
     def duty_cycle=(ratio)
       ratio = validate_duty(ratio)
       @mutex.synchronize { @duty = ratio }
+      send_settings if @process
       ratio
     end
 
@@ -136,7 +175,11 @@ module Rgpio
       return self if @running
 
       @running = true
-      @thread = Thread.new { generate }
+      if @process
+        send_settings
+      else
+        @thread = Thread.new { generate }
+      end
       self
     end
 
@@ -145,9 +188,16 @@ module Rgpio
       return self unless @running
 
       @running = false
-      @thread&.join
-      @thread = nil
-      @request.set_value(@gpio, :inactive)
+      if @process
+        # The child answers once the line is inactive, so that disable means
+        # the same thing in both modes: no edge after it returns.
+        send_settings
+        @replies.read(1)
+      else
+        @thread&.join
+        @thread = nil
+        @request.set_value(@gpio, :inactive)
+      end
       self
     end
 
@@ -160,10 +210,18 @@ module Rgpio
     def close
       return if @closed
 
-      disable
       @closed = true
-      @request.release
-      @chip.close if @owns_chip
+      if @process
+        # No disable first: closing the pipe is the child's signal to leave
+        # the line inactive, release it and exit, and it works even when the
+        # child is already gone.
+        @running = false
+        stop_child
+      else
+        disable
+        @request.release
+        @chip.close if @owns_chip
+      end
     end
 
     def closed?
@@ -171,11 +229,23 @@ module Rgpio
     end
 
     def inspect
-      format("#<%s gpio=%d frequency=%gHz duty_cycle=%.3f%s>",
-             self.class, @gpio, @frequency, @duty, @running ? " running" : "")
+      format("#<%s gpio=%d frequency=%gHz duty_cycle=%.3f%s%s>",
+             self.class, @gpio, @frequency, @duty, @process ? " process" : "", @running ? " running" : "")
     end
 
     private
+
+    def resolve_process(process)
+      case process
+      when :auto then self.class.single_core?
+      when true, false then process
+      else raise ArgumentError, "process must be :auto, true or false, got #{process.inspect}"
+      end
+    end
+
+    def request_line(chip, consumer)
+      chip.request_lines(offsets: [@gpio], direction: :output, initial_value: :inactive, consumer: consumer)
+    end
 
     def now
       Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -228,6 +298,7 @@ module Rgpio
           @request.set_value(@gpio, :inactive)
         end
 
+        between_cycles
         deadline += period
         read_settings do |p, h|
           period = p

@@ -140,19 +140,28 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   STOP its pointer reads as the temperature register. Registers other than
   0x00 need the repeated START of `write_read`, which the driver uses.
   Verified 2026-11-18.
+- Pi Zero W `Servo` (GPIO4, `examples/servo.rb`, by eye): centres, reaches
+  both ends and sweeps smoothly by angle with pulses from the child process;
+  it trembles slightly while holding. Behind that, over 60 s runs at 50 Hz / 1500 us
+  with a main loop computing an angle every 20 ms: thread 9-10 pulses a minute
+  more than 1 ms off (worst 6.8-14.2 ms), child process 3-6 (worst 1.5-7.9 ms).
+  A shorter EEVDF time slice for the child (`sched_setattr`, `sched_runtime`
+  0.1 ms, allowed unprivileged on 6.12+) made no measurable difference and was
+  dropped. A main program that keeps the core busy defeats both modes.
+  Verified 2026-11-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
 
 **Not yet validated on real hardware:**
 
-- Pi Zero W GPIO and PWM device classes (`LED`, `Button`, `Servo`, …) and
-  `MCP3208`; Pi Zero 2 W and Pi 1. The
+- Pi Zero W device classes other than `Servo` (`LED`, `Button`, `PWMLED`,
+  `RGBLED`, …) and `MCP3208`; Pi Zero 2 W and Pi 1. The
   `i2c_msg` struct layout is 32-bit-aware (the buffer pointer sits at offset 8
   either way) but has only been exercised on aarch64.
-- Whether `SoftwarePWM` on a Pi Zero should reduce its own garbage (the
-  `clock_gettime` Floats in the spin loop); GC from the user's program would
-  remain either way.
+- Pi Zero W: the remaining servo tremble (see above). Hardware PWM or a
+  servo driver board removes it; whether the gem should make hardware PWM
+  easier on the Zero is to be discussed.
 - `Rgpio::ST7032` on a 16-column AQM1602, and on a 5 V module (`booster: false`);
   only the 8x2 AQM0802 at 3.3 V has been on the bus.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is

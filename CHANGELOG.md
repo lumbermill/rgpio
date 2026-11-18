@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- On a single-core board (Pi Zero / Pi 1) `SoftwarePWM` generates the waveform
+  in a forked child process (`process: :auto`; `true` / `false` to choose).
+  The child disables the garbage collector and collects only inside the low
+  phase. At 50 Hz on a Pi Zero, pulses more than 1 ms off went from 9-10 to
+  3-6 a minute and the worst from 14 ms to 2-8 ms. A servo still trembles a
+  little there, and the guide says so. The child exits, leaving the line
+  inactive, when its parent closes the channel or exits. Multi-core boards
+  keep the thread, so nothing changes on a Pi 4 or Pi 5. Adds
+  `SoftwarePWM#process?`.
+- `examples/servo.rb` ends with a hold (15 s, or the first argument) to watch
+  for twitches, and says where its pulses come from.
 - `LineRequest#get_value` / `#set_value` / `#get_values` / `#set_values` issue
   `GPIO_V2_LINE_GET_VALUES` / `SET_VALUES` with `IO#ioctl` on the request's file
   descriptor instead of calling libgpiod's value functions through fiddle. A

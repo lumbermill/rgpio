@@ -19,18 +19,23 @@
 # understands; widen it only as far as the datasheet allows, since a servo driven
 # past its travel buzzes and heats up.
 #
-# Run:
+# Run (the last phase holds still for HOLD seconds, 15 by default — a twitch
+# there is a late pulse; on a Pi Zero the pulses come from a child process, see
+# Rgpio::SoftwarePWM):
 #   ruby examples/servo.rb
+#   ruby examples/servo.rb 60
 
 require_relative "../lib/rgpio"
 
 SERVO_GPIO = 4
+HOLD = Integer(ARGV.fetch(0, 15))
 
 # Say what the device is doing as it happens, so the terminal and the bench agree.
 $stdout.sync = true
 
 servo = Rgpio::Servo.new(SERVO_GPIO, min_pulse_us: 1000, max_pulse_us: 2000)
-puts "Servo on GPIO#{SERVO_GPIO}, #{servo.pwm.frequency} Hz frames. Ctrl-C to stop."
+mode = servo.pwm.respond_to?(:process?) && servo.pwm.process? ? "a child process" : "a thread"
+puts "Servo on GPIO#{SERVO_GPIO}, #{servo.pwm.frequency} Hz frames from #{mode}. Ctrl-C to stop."
 
 begin
   puts "centre (#{servo.pulse_width_us.round} us)"
@@ -59,6 +64,10 @@ begin
       sleep 0.01
     end
   end
+
+  puts "holding at +45 degrees for #{HOLD} s — watch for twitches"
+  servo.angle = 45
+  sleep HOLD
 
   puts "detaching — the horn goes limp and the servo stops drawing current"
   servo.detach

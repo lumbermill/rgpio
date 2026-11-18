@@ -387,15 +387,30 @@ degree of travel. A busy machine widens that: while the main thread holds the
 GVL, the generating thread cannot wake. Python has the same limitation with the
 GIL, and gpiozero's PWM is software-timed too.
 
-A Pi Zero (single-core ARMv6) is a different machine. Measured the same way at
-50 Hz / 1500 us, the median pulse sits 30 us long and is steady, but Ruby's
-garbage collector stops every thread for 3 ms (minor) to 40 ms (major) there, and
-a pulse caught by one comes out several milliseconds long — 32-bit Ruby boxes
-every Float, so even an idle program produces garbage. Under `chrt -f` with
-`GC.disable` the spread drops to 5 us, so the cause is the collector, not the
-code. On a Zero, software PWM suits an LED, where one long pulse is invisible; a
-servo will twitch now and then. Frequencies above about 200 Hz cost a large share
-of the one core.
+#### On a Pi Zero / Pi 1 (one core)
+
+> **A servo trembles slightly on a Pi Zero.** It holds its position and sweeps
+> smoothly, but a stray long pulse now and then shows as a small shake. For a
+> servo that must stand perfectly still, use hardware PWM or a dedicated servo
+> driver board. An LED is unaffected: one long pulse is invisible.
+
+Ruby's garbage collector stops every thread for 3 ms (minor) to 40 ms (major)
+on this CPU, and 32-bit Ruby boxes every Float, so even an idle program collects.
+A pulse caught by a collection comes out milliseconds long. So on a single-core
+board the waveform is generated in a forked child process instead of a thread
+(`process: :auto`; pass `process: true` or `false` to choose). The child runs
+with the collector off and collects only right after a falling edge, inside the
+low phase, and your program's own collections no longer stop it. When your
+program exits, however it exits, the child sees its pipe close, leaves the line
+inactive and exits as well.
+
+Measured at 50 Hz / 1500 us over 3000 pulses, while the main program computed
+an angle every 20 ms: the median pulse sits 30 us long and steady, and pulses
+more than 1 ms off went from 9-10 a minute (worst 14 ms) with a thread to 3-6 a
+minute (worst 2-8 ms) with the child. Those that remain come from the one core
+being busy with something else. A program that keeps the core busy, such as a
+tight loop that allocates, takes the child's time just as it took the thread's.
+Frequencies above about 200 Hz take a large share of the core.
 
 
 ## Hardware PWM Usage
@@ -1073,13 +1088,14 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 
 | Method | Description |
 |---|---|
-| `.new(gpio, frequency:, duty_cycle:, spin_us:, chip:, consumer:)` | Claim a line and prepare a channel |
+| `.new(gpio, frequency:, duty_cycle:, spin_us:, chip:, consumer:, process:)` | Claim a line and prepare a channel; `process:` is `:auto` (a child process on a single-core board), `true` or `false` |
 | `.open(gpio, ...) { \|pwm\| }` | Block form; closes on exit |
 | `#frequency` / `#frequency=` | Hz, 0.1..10000 |
 | `#duty_cycle` / `#duty_cycle=` | 0.0..1.0 (`#duty_ratio` is an alias) |
 | `#pulse_width_us` / `#pulse_width_us=` | High time in microseconds |
 | `#enable` / `#disable` / `#enabled?` | Start and stop generating |
 | `#spin_us` | Microseconds spent spinning before each edge |
+| `#process?` | Whether a child process generates the waveform |
 | `#close` / `#closed?` | Stop, release the line, close an owned chip |
 
 ### `Rgpio::PWMOutputDevice` (and `Rgpio::PWMLED`)
