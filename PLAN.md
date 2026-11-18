@@ -129,10 +129,11 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   after a separate `write([reg])` always returns the ADT7410's register 0x00
   (temperature), while `write_read` returns the pointed register (0x0b → 0xcb,
   0x04 → 0x20 0x00). A fresh ADT7410 did exactly the same as one that had
-  just survived a reversed supply, so it is not damage; whether the chip or
-  the bcm2835 controller is responsible is still open (try the same on a
-  Pi 5). The driver uses `write_read`, so it is unaffected. Verified
-  2026-11-18.
+  just survived a reversed supply, so it is not damage, and a Pi 5 (RP1
+  controller) gives the identical table, so it is the ADT7410 itself: after a
+  STOP its pointer reads as the temperature register. Registers other than
+  0x00 need the repeated START of `write_read`, which the driver uses.
+  Verified 2026-11-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
