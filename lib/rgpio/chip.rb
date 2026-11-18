@@ -17,6 +17,8 @@ module Rgpio
   #   # ...
   #   chip.close
   class Chip
+    extend Openable
+
     # Glob matching every GPIO character device exposed by the kernel.
     DEVICE_GLOB = "/dev/gpiochip*".freeze
 
@@ -45,15 +47,6 @@ module Rgpio
       return unless @chip_ptr.null?
 
       raise SystemCallError.new("gpiod_chip_open(#{@path})", Native.errno)
-    end
-
-    # Open a chip, yield it to the block, then close it.
-    # With no path, auto-detects the header GPIO controller.
-    def self.open(path = nil, &block)
-      chip = new(path)
-      block.call(chip)
-    ensure
-      chip&.close
     end
 
     # Enumerate every GPIO chip present on the system.

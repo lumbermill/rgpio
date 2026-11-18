@@ -51,11 +51,11 @@ class HardwarePWMTest < Minitest::Test
   end
 
   # ------------------------------------------------------------------ #
-  # GPIO_TO_PWM_CHANNEL_PI5
+  # GPIO_TO_PWM_CHANNEL
 
   def test_gpio_to_pwm_channel_mapping
     assert_equal({ 12 => 0, 13 => 1, 18 => 2, 19 => 3 },
-                 Rgpio::HardwarePWM::GPIO_TO_PWM_CHANNEL_PI5)
+                 Rgpio::HardwarePWM::GPIO_TO_PWM_CHANNEL[:pi5])
   end
 
   # ------------------------------------------------------------------ #
@@ -233,18 +233,41 @@ class HardwarePWMTest < Minitest::Test
     assert_in_delta 0.075, pwm.duty_ratio, 1e-9
   end
 
-  def test_duty_cycle_clamps_above_1
+  def test_duty_cycle_reads_back_under_both_names
     pwm = pwm_for_gpio18
     pwm.frequency = 50
-    pwm.duty_cycle = 1.5
-    assert_equal 1.0, pwm.duty_ratio
+    pwm.duty_cycle = 0.25
+    assert_in_delta 0.25, pwm.duty_cycle
+    assert_in_delta 0.25, pwm.duty_ratio
   end
 
-  def test_duty_cycle_clamps_below_0
+  def test_duty_cycle_outside_0_to_1_raises_like_software_pwm
     pwm = pwm_for_gpio18
     pwm.frequency = 50
-    pwm.duty_cycle = -0.1
-    assert_equal 0.0, pwm.duty_ratio
+    assert_raises(ArgumentError) { pwm.duty_cycle = 1.5 }
+    assert_raises(ArgumentError) { pwm.duty_cycle = -0.1 }
+    assert_raises(ArgumentError) { pwm.duty_cycle = "half" }
+    assert_nil pwm.duty_ratio, "a rejected value is not stored"
+  end
+
+  def test_pulse_width_outside_the_period_raises
+    pwm = pwm_for_gpio18
+    pwm.frequency = 50
+    assert_raises(ArgumentError) { pwm.pulse_width_us = -1 }
+    assert_raises(ArgumentError) { pwm.pulse_width_us = 20_001 }
+    pwm.pulse_width_us = 20_000
+    assert_in_delta 1.0, pwm.duty_cycle
+  end
+
+  def test_open_without_a_block_returns_the_channel
+    add_chip(num: 2, npwm: 4)
+    add_channel(chip_num: 2, channel: 2)
+    pwm = Rgpio::HardwarePWM.open(chip: 2, channel: 2)
+    assert_kind_of Rgpio::HardwarePWM, pwm
+    refute_predicate pwm, :closed?
+    pwm.close
+    assert_predicate pwm, :closed?
+    pwm.close
   end
 
   def test_duty_cycle_without_frequency_raises

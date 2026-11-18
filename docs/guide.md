@@ -982,7 +982,7 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 | Method | Description |
 |---|---|
 | `.new(path = nil)` | Open chip; auto-detects header controller when `path` is nil |
-| `.open(path = nil) { \|chip\| }` | Block form; closes on exit |
+| `.open(path = nil) { \|chip\| }` | Block form; closes on exit (without a block, returns the chip) |
 | `.list` | Array of `{path:, name:, label:, num_lines:}` for every gpiochip |
 | `.detect_path` | Device path of the header GPIO controller (Pi 5 / 4 / Zero) |
 | `#path` | Device path this chip was opened with |
@@ -1214,15 +1214,15 @@ ruby examples/pwm_jitter.rb --hz 50 --duty 0.075 --seconds 5
 |---|---|
 | `.new(gpio:, board:)` | Auto-detect chip/channel for a GPIO pin (board auto-detected) |
 | `.new(chip:, channel:)` | Explicit chip/channel |
-| `.open(...) { \|pwm\| }` | Block form; closes on exit |
+| `.open(...) { \|pwm\| }` | Block form; closes on exit (without a block, returns the channel) |
 | `.available_chips` | List sysfs PWM chips |
 | `.detect_board` | Board family from the device-tree model (`:pi5` / `:pi4` / `:unknown`) |
 | `#board` | Resolved board family |
 | `#frequency=` / `#frequency` | Hz |
-| `#duty_cycle=` / `#duty_ratio` | 0.0–1.0 ratio |
+| `#duty_cycle=` / `#duty_cycle` | 0.0..1.0; outside it raises `ArgumentError` (`#duty_ratio` is an alias) |
 | `#pulse_width_us=` / `#pulse_width_us` | Microseconds |
 | `#enable` / `#disable` | Start/stop PWM output |
-| `#close` | Disable and unexport |
+| `#close` / `#closed?` | Disable and unexport |
 
 
 ## Architecture

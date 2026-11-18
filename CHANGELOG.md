@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `HardwarePWM` behaves like `SoftwarePWM` where the device layer sees both:
+  `duty_cycle=` raises `ArgumentError` outside 0.0..1.0 instead of clamping,
+  `pulse_width_us=` raises when negative or longer than the period, and
+  `#duty_cycle` (reader) and `#closed?` exist. `HardwarePWM.open` and
+  `Chip.open` return the instance when called without a block, like the
+  other `open`s, instead of failing.
+- Removed `HardwarePWM::GPIO_TO_PWM_CHANNEL_PI5`; use
+  `GPIO_TO_PWM_CHANNEL[:pi5]`.
 - `lib/rgpio/pwm.rb` is now `lib/rgpio/hardware_pwm.rb`, next to
   `software_pwm.rb`. Internal duplication is gone: `PWMOutputDevice` and
   `Servo` share a `PWMDevice` base class, the block-or-return `open` of

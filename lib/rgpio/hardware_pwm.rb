@@ -33,6 +33,8 @@ module Rgpio
   #   pwm.enable
   #   pwm.close   # disables + unexports
   class HardwarePWM
+    extend Openable
+
     PWM_SYSFS_ROOT = "/sys/class/pwm".freeze
 
     # Files written after export, each of which must be writable first.
@@ -56,9 +58,6 @@ module Rgpio
       pi4: { 12 => 0, 13 => 1, 18 => 0, 19 => 1 }.freeze,
       pi_zero: { 12 => 0, 13 => 1, 18 => 0, 19 => 1 }.freeze,
     }.freeze
-
-    # Backwards-compatible alias for the Pi 5 mapping.
-    GPIO_TO_PWM_CHANNEL_PI5 = GPIO_TO_PWM_CHANNEL[:pi5]
 
     # Hints for locating the header PWM chip in sysfs, per board family:
     #   address — substring of the chip's device symlink (the peripheral the
@@ -98,15 +97,8 @@ module Rgpio
 
       @period_ns = nil
       @exported  = false
+      @closed    = false
       export_channel
-    end
-
-    # Open a PWM channel, yield it, then close it (disable + unexport).
-    def self.open(**, &block)
-      pwm = new(**)
-      block.call(pwm)
-    ensure
-      pwm&.close
     end
 
     # @return [Integer] resolved pwmchip number
@@ -143,24 +135,37 @@ module Rgpio
     # Set duty cycle as a ratio (0.0–1.0).
     # frequency= must be called first.
     # @param ratio [Float] 0.0 = always off, 1.0 = always on
+    # @raise [ArgumentError] outside 0.0..1.0, as {SoftwarePWM} does
     def duty_cycle=(ratio)
+      unless ratio.is_a?(Numeric) && (0.0..1.0).cover?(ratio)
+        raise ArgumentError, "duty cycle must be in 0.0..1.0, got #{ratio.inspect}"
+      end
       raise PWMError, "Set frequency= before duty_cycle=" unless @period_ns
 
-      ratio = ratio.clamp(0.0, 1.0)
-      @duty_ratio = ratio
+      @duty_ratio = ratio.to_f
       write_sysfs("duty_cycle", (@duty_ratio * @period_ns).round)
     end
 
-    # @return [Float, nil] current duty cycle ratio
+    # @return [Float, nil] current duty cycle ratio, nil until one is set
     attr_reader :duty_ratio
+
+    # Same as {#duty_ratio}, under {SoftwarePWM}'s name.
+    alias duty_cycle duty_ratio
 
     # Set pulse width in microseconds (convenience for servo control).
     # frequency= must be called first.
     # @param us [Numeric] pulse width in microseconds
+    # @raise [ArgumentError] when negative or longer than the period, as
+    #   {SoftwarePWM} does
     def pulse_width_us=(us)
+      raise ArgumentError, "pulse width must not be negative, got #{us}" if us.negative?
       raise PWMError, "Set frequency= before pulse_width_us=" unless @period_ns
 
       ns = (us * 1000).round
+      if ns > @period_ns
+        raise ArgumentError, "pulse width #{us} us is longer than the period (#{@period_ns / 1000.0} us)"
+      end
+
       @duty_ratio = ns.to_f / @period_ns
       write_sysfs("duty_cycle", ns)
     end
@@ -188,9 +193,17 @@ module Rgpio
       @enabled || false
     end
 
+    def closed?
+      @closed
+    end
+
     # Disable and unexport the PWM channel, freeing the sysfs resource.
-    # Safe to call multiple times.
+    # A channel that was already exported when it was opened is left as it
+    # was found. Safe to call multiple times.
     def close
+      return if @closed
+
+      @closed = true
       return unless @exported
 
       disable rescue nil
