@@ -1,8 +1,25 @@
 # rgpio
 
-Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git) — the modern Linux GPIO character device API.
+GPIO, PWM, I2C and SPI on Raspberry Pi from Ruby, through the kernel's own
+interfaces rather than direct register access:
 
-Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1); line values are read and written with `IO#ioctl` on the request's descriptor, which on a Pi Zero is eight times faster than libgpiod's value functions through fiddle.
+- **GPIO** — [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git),
+  the Linux GPIO character device (`uAPI v2`), instead of the deprecated sysfs
+  GPIO interface. Works on the Pi 5's RP1 as on older boards.
+- **PWM** — either the hardware PWM peripheral through the kernel's PWM
+  subsystem (`/sys/class/pwm`), jitter-free but needing a `dtoverlay`, or
+  software PWM timed in Ruby on any line, with no configuration at all.
+- **I2C and SPI** — `ioctl` calls on `/dev/i2c-N` and `/dev/spidev*`; no
+  libgpiod involved.
+
+On top sits a gpiozero-style device layer (`LED`, `Button`, `Servo`, ...).
+
+No C extension — libgpiod is called through the stdlib
+[`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi`
+gem) is built with the interpreter and works on every Pi, including ARMv6 boards
+(Pi Zero / Pi 1). Line values are read and written with `IO#ioctl` on the
+request's descriptor, which on a Pi Zero is eight times faster than libgpiod's
+value functions through fiddle.
 
 > **Status:** GPIO + hardware PWM verified on Raspberry Pi 5 and Raspberry Pi 4
 > (Trixie, libgpiod 2.x); GPIO, hardware PWM, I2C and SPI also verified on a
@@ -28,7 +45,7 @@ Rgpio.pause                          # run the callbacks until Ctrl-C
 
 - **OS:** Debian Trixie (13) or later — verified target. Bookworm ships libgpiod 1.x, which is not supported.
 - **Hardware:** Raspberry Pi 5 and Pi 4 (verified); Pi Zero W for GPIO, hardware PWM, I2C and SPI (verified). Other Pi models and device classes on the Zero: see [PLAN.md](PLAN.md).
-- **Library:** `libgpiod2` (>= 2.1)
+- **Library:** libgpiod >= 2.1 (Debian package `libgpiod3`)
 - **Ruby:** >= 3.3 (CRuby) — matches Trixie's default `ruby`
 
 Install the runtime library on the Pi:
@@ -98,6 +115,14 @@ wiring notes, the [API reference](docs/guide.md#api-reference) and
 [how to run the examples](docs/guide.md#running-the-examples) in
 [`examples/`](examples). Devices written but still waiting on hardware
 verification (such as `MotionSensor`) are listed in [PLAN.md](PLAN.md).
+
+The PWM devices choose their channel from the pin. GPIO12/13/18/19 use the
+hardware PWM peripheral once a `dtoverlay` line in `config.txt` routes the pin
+to it; every other line, and those four without the overlay, use software PWM,
+which needs no configuration. The
+[Hardware PWM guide](docs/guide.md#hardware-pwm-usage) has the overlay line for
+each pin, and [Choosing the channel](docs/guide.md#choosing-the-channel) how
+the choice is made.
 
 ## Project status
 
