@@ -153,15 +153,25 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
 
+- Pi Zero W hardware PWM (`raspi27.local`, Trixie, with
+  `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` under `[all]`): board
+  detection → `:pi_zero`, chip `pwmchip0` at `2020c000` (`npwm == 2`), GPIO12
+  → channel 0. The PWM clock came up at 50 MHz on its own, despite the overlay
+  README's note that it "must have been enabled and configured by other
+  means". 50 Hz / 1500 us over 3000 pulses (kernel edge timestamps on GPIO24):
+  pulse mean 1502.3 us, sd 4.2 us, worst 51 us off; period sd 3.3 us; none
+  more than 1 ms off, against 3-6 a minute from `SoftwarePWM`. The spread is
+  the measuring side's interrupt latency on the one core, not the waveform.
+  Verified 2026-11-18.
+
 **Not yet validated on real hardware:**
 
 - Pi Zero W device classes other than `Servo` (`LED`, `Button`, `PWMLED`,
   `RGBLED`, …) and `MCP3208`; Pi Zero 2 W and Pi 1. The
   `i2c_msg` struct layout is 32-bit-aware (the buffer pointer sits at offset 8
   either way) but has only been exercised on aarch64.
-- Pi Zero W: the remaining servo tremble (see above). Hardware PWM or a
-  servo driver board removes it; whether the gem should make hardware PWM
-  easier on the Zero is to be discussed.
+- Pi Zero W: hardware PWM on GPIO13 (channel 1) has only been seen toggling
+  through `pinctrl`; GPIO12 is the one measured (see above).
 - `Rgpio::ST7032` on a 16-column AQM1602, and on a 5 V module (`booster: false`);
   only the 8x2 AQM0802 at 3.3 V has been on the bus.
 - `Rgpio::ADT7410` below 0 degC — the negative branch of the conversion is

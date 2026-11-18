@@ -34,6 +34,9 @@ module Rgpio
   class HardwarePWM
     PWM_SYSFS_ROOT = "/sys/class/pwm".freeze
 
+    # Files written after export, each of which must be writable first.
+    CHANNEL_ATTRIBUTES = %w[period duty_cycle enable].freeze
+
     # The overlay setup, linked from chip-detection errors. The gem ships no
     # docs of its own, so the messages point at the guide on GitHub.
     GUIDE_URL = "https://github.com/lumbermill/rgpio/blob/main/docs/guide.md#hardware-pwm-usage".freeze
@@ -46,9 +49,11 @@ module Rgpio
     #
     #   Pi 5 (RP1):     GPIO12/13/18/19 → channels 0/1/2/3 (one 4-channel chip)
     #   Pi 4 (BCM2711): GPIO12/18 → channel 0 (PWM0), GPIO13/19 → channel 1 (PWM1)
+    #   Pi Zero / Pi 1 (BCM2835): the same two channels as the Pi 4
     GPIO_TO_PWM_CHANNEL = {
       pi5: { 12 => 0, 13 => 1, 18 => 2, 19 => 3 }.freeze,
       pi4: { 12 => 0, 13 => 1, 18 => 0, 19 => 1 }.freeze,
+      pi_zero: { 12 => 0, 13 => 1, 18 => 0, 19 => 1 }.freeze,
     }.freeze
 
     # Backwards-compatible alias for the Pi 5 mapping.
@@ -60,10 +65,12 @@ module Rgpio
     #   npwm    — channel count of that chip
     # Pi 5 (RP1 PWM0 at 1f00098000, 4 channels) is verified. Pi 4 (BCM2711 PWM0
     # at fe20c000, 2 channels) is provisional, pending hardware validation
-    # (see PLAN.md).
+    # (see PLAN.md). Pi Zero (BCM2835 PWM at bus address 7e20c000, which the
+    # SoC's ranges map to 2020c000, 2 channels) is likewise provisional.
     PWM_CHIP_PROFILE = {
       pi5: { address: "1f00098000", npwm: 4 }.freeze,
       pi4: { address: "fe20c000",   npwm: 2 }.freeze,
+      pi_zero: { address: "2020c000", npwm: 2 }.freeze,
     }.freeze
 
     # @param gpio    [Integer, nil] GPIO line offset to look up chip/channel
@@ -71,8 +78,8 @@ module Rgpio
     # @param chip    [Integer, :auto] pwmchip number, or :auto to detect the
     #                 header PWM chip for the current board.
     # @param channel [Integer] PWM channel number within the chip
-    # @param board   [:auto, :pi5, :pi4] board family for the gpio: mapping and
-    #                 chip auto-detection. :auto reads the device-tree model.
+    # @param board   [:auto, :pi5, :pi4, :pi_zero] board family for the gpio:
+    #                 mapping and chip auto-detection. :auto reads the device-tree model.
     def initialize(gpio: nil, chip: :auto, channel: 0, board: :auto)
       @board = board == :auto ? self.class.detect_board : board
 
@@ -107,7 +114,7 @@ module Rgpio
     # @return [Integer] channel number within the chip
     attr_reader :channel
 
-    # @return [:pi5, :pi4, :unknown] resolved board family
+    # @return [:pi5, :pi4, :pi_zero, :unknown] resolved board family
     attr_reader :board
 
     # Set PWM frequency in Hz.
@@ -208,11 +215,15 @@ module Rgpio
     end
 
     # Detect the Raspberry Pi board family from the device-tree model string.
-    # @return [:pi5, :pi4, :unknown]
+    # :pi_zero covers every BCM2835 board: the Zero and Zero W, and the Pi 1
+    # ("Raspberry Pi Model B Plus", "Raspberry Pi Compute Module Rev 1.0").
+    # The Zero 2 W is a BCM2710 and does not match.
+    # @return [:pi5, :pi4, :pi_zero, :unknown]
     def self.detect_board(model = board_model)
       case model
       when /Raspberry Pi 5/ then :pi5
       when /Raspberry Pi (?:4|400)/, /Compute Module 4/ then :pi4
+      when /Raspberry Pi Zero(?! 2)/, /Raspberry Pi (?:Model|Compute Module Rev)/ then :pi_zero
       else :unknown
       end
     end
@@ -231,7 +242,7 @@ module Rgpio
       table = GPIO_TO_PWM_CHANNEL.fetch(@board) do
         raise ArgumentError,
               "Hardware PWM gpio: mapping is unknown for board #{@board.inspect}. " \
-              "Pass board: :pi5 / :pi4, or chip:/channel: explicitly."
+              "Pass board: :pi5 / :pi4 / :pi_zero, or chip:/channel: explicitly."
       end
       table.fetch(gpio) do
         raise ArgumentError,
@@ -300,15 +311,18 @@ module Rgpio
     end
 
     def wait_for_channel_path!
-      # Wait for the `period` file to become writable, not just the directory.
-      # The udev rule (99-com.rules) runs chgrp/chmod after the directory appears,
-      # so polling only for directory existence creates a race.
-      period_path = File.join(@channel_path, "period")
+      # Wait for every attribute file to become writable, not just the
+      # directory or one file. The udev rule (99-com.rules) runs `chgrp -R` and
+      # then `chmod -R` after the directory appears, one file at a time, so on
+      # a Pi Zero `period` was writable while `duty_cycle` was not yet.
       deadline = Time.now + 3.0
-      until File.writable?(period_path)
-        raise PWMError, "Timeout: #{period_path} did not become writable after export" if Time.now > deadline
+      CHANNEL_ATTRIBUTES.each do |attr|
+        path = File.join(@channel_path, attr)
+        until File.writable?(path)
+          raise PWMError, "Timeout: #{path} did not become writable after export" if Time.now > deadline
 
-        sleep 0.02
+          sleep 0.02
+        end
       end
     end
 

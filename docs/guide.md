@@ -391,8 +391,10 @@ GIL, and gpiozero's PWM is software-timed too.
 
 > **A servo trembles slightly on a Pi Zero.** It holds its position and sweeps
 > smoothly, but a stray long pulse now and then shows as a small shake. For a
-> servo that must stand perfectly still, use hardware PWM or a dedicated servo
-> driver board. An LED is unaffected: one long pulse is invisible.
+> servo that must stand perfectly still, use hardware PWM
+> (`Rgpio::Servo.new(12, pwm: :hardware)`, after adding the
+> [config.txt line for the Pi Zero](#pi-zero--zero-w--pi-1)) or a dedicated
+> servo driver board. An LED is unaffected: one long pulse is invisible.
 
 Ruby's garbage collector stops every thread for 3 ms (minor) to 40 ms (major)
 on this CPU, and 32-bit Ruby boxes every Float, so even an idle program collects.
@@ -439,6 +441,29 @@ To enable two channels simultaneously (e.g. GPIO18 + GPIO19):
 ```
 dtoverlay=pwm-2chan,pin=18,func=2,pin2=19,func2=2
 ```
+
+#### Pi Zero / Zero W / Pi 1
+
+The BCM2835 has the same two channels as the Pi 4, so **at most two hardware
+PWM outputs run at once**: one of GPIO12/18 (PWM0) and one of GPIO13/19 (PWM1).
+GPIO18/19 double as the I2S (PCM) pins, so GPIO12/13 are the better choice.
+Add this line to the end of `/boot/firmware/config.txt` and reboot:
+
+```
+dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4
+```
+
+> **Put it under `[all]`.** A line in square brackets such as `[cm5]` or
+> `[pi5]` limits everything below it, up to the next one, to that board. The
+> stock file ends with an `[all]` section, so the very end is safe; a line
+> placed under `[cm5]` is silently ignored on a Pi Zero.
+
+Measured on a Pi Zero W at 50 Hz / 1500 us over 3000 pulses, no pulse was more
+than 1 ms off (software PWM: 3-6 a minute), so a servo stands still.
+
+For one channel only, use `dtoverlay=pwm,pin=12,func=4`. The analogue-audio
+conflict that the overlay documentation warns about does not apply: a Pi Zero
+has no analogue audio output.
 
 **Without rebooting** (volatile, for quick testing) you can load the same
 overlay at runtime — pass the parameters space-separated instead of as a CSV:
@@ -511,6 +536,9 @@ alternatives (use one at a time):
 | GPIO18 | 12 | 0 (PWM0) |
 | GPIO13 | 33 | 1 (PWM1) |
 | GPIO19 | 35 | 1 (PWM1) |
+
+**Pi Zero / Zero W / Pi 1 (BCM2835)** — the same two channels and pins as the
+Pi 4. The board resolves as `:pi_zero`.
 
 ### Manual chip/channel specification
 
@@ -846,6 +874,10 @@ ruby examples/rgb_balance.rb
 
 # Sweep a servo on GPIO4, by value and by angle
 ruby examples/servo.rb
+
+# The same sweep from hardware PWM on GPIO12 (needs the config.txt line in
+# "Hardware PWM Usage")
+ruby examples/servo_with_hw.rb
 
 # Report which PWM chip and channel each header GPIO resolves to
 ruby examples/pwm_info.rb

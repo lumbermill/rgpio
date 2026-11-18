@@ -64,5 +64,5 @@ if table
   end
 else
   puts "No header GPIO -> channel mapping for board #{board.inspect}. " \
-       "Pass board: :pi5/:pi4 or chip:/channel: explicitly."
+       "Pass board: :pi5/:pi4/:pi_zero or chip:/channel: explicitly."
 end

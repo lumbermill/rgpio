@@ -5,8 +5,8 @@ Ruby bindings for [libgpiod v2](https://git.kernel.org/pub/scm/libs/libgpiod/lib
 Provides GPIO input/output and jitter-free hardware PWM control on Raspberry Pi, targeting the `uAPI v2` ioctl interface instead of the deprecated sysfs GPIO interface. No C extension — calls `libgpiod.so` directly through the stdlib [`fiddle`](https://github.com/ruby/fiddle), which (unlike the precompiled `ffi` gem) is built with the interpreter and works on every Pi, including ARMv6 boards (Pi Zero / Pi 1); line values are read and written with `IO#ioctl` on the request's descriptor, which on a Pi Zero is eight times faster than libgpiod's value functions through fiddle.
 
 > **Status:** GPIO + hardware PWM verified on Raspberry Pi 5 and Raspberry Pi 4
-> (Trixie, libgpiod 2.x); GPIO, I2C and SPI also verified on a Pi Zero W
-> (ARMv6). The device API (`LED` / `Button` / `Motor`) is verified on Pi 5.
+> (Trixie, libgpiod 2.x); GPIO, hardware PWM, I2C and SPI also verified on a
+> Pi Zero W (ARMv6). The device API (`LED` / `Button` / `Motor`) is verified on Pi 5.
 > Hardware PWM (sysfs) also works on a Bookworm Pi 4, where the libgpiod GPIO
 > path is unavailable (v1). Multi-board support, the roadmap, and planned APIs
 > are tracked in [PLAN.md](PLAN.md); released changes are recorded in
@@ -27,7 +27,7 @@ Rgpio.pause                          # run the callbacks until Ctrl-C
 ## Requirements
 
 - **OS:** Debian Trixie (13) or later — verified target. Bookworm ships libgpiod 1.x, which is not supported.
-- **Hardware:** Raspberry Pi 5 and Pi 4 (verified); Pi Zero W for GPIO, I2C and SPI (verified). Other Pi models and device classes on the Zero: see [PLAN.md](PLAN.md).
+- **Hardware:** Raspberry Pi 5 and Pi 4 (verified); Pi Zero W for GPIO, hardware PWM, I2C and SPI (verified). Other Pi models and device classes on the Zero: see [PLAN.md](PLAN.md).
 - **Library:** `libgpiod2` (>= 2.1)
 - **Ruby:** >= 3.3 (CRuby) — matches Trixie's default `ruby`
 

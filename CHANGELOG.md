@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   naming two jumpered pins). They cover input/output levels, bias,
   `active_low`, batch I/O, edge events, line ownership and `LED` → `Button`
   callbacks. Verified on Pi 5 and on a Pi Zero W (ARMv6).
+- `HardwarePWM` recognises the BCM2835 boards (Pi Zero, Zero W, Pi 1) as
+  `board: :pi_zero`: two channels, GPIO12/18 on PWM0 and GPIO13/19 on PWM1,
+  on the chip at `2020c000`. The guide gives the config.txt line. Verified on
+  a Pi Zero W: 3000 pulses at 50 Hz / 1500 us showed no pulse more than 1 ms
+  off, and a 4 us spread, which is the measurement's own noise.
+- `examples/servo_with_hw.rb`: the `servo.rb` sweep from hardware PWM on
+  GPIO12, with the config.txt line in its header comment.
 
 ### Changed
 
@@ -54,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tests; the kernel-function case is verified on a Pi with I2C enabled.
 - The guide gains "Pins taken by another function", listing the pins each bus
   takes.
+
+### Fixed
+
+- `HardwarePWM` waits after export until `period`, `duty_cycle` and `enable`
+  are all writable, not only `period`. The udev rule fixes their permissions
+  one file at a time, and on a Pi Zero `Servo.new(12, pwm: :hardware)` failed
+  with `EACCES` on `duty_cycle`.
 
 ## [0.1.1] - 2026-10-23
 

@@ -139,9 +139,35 @@ class HardwarePWMTest < Minitest::Test
     assert_equal :pi4, Rgpio::HardwarePWM.detect_board("Raspberry Pi Compute Module 4 Rev 1.0")
   end
 
+  def test_detect_board_pi_zero_variants
+    assert_equal :pi_zero, Rgpio::HardwarePWM.detect_board("Raspberry Pi Zero W Rev 1.1")
+    assert_equal :pi_zero, Rgpio::HardwarePWM.detect_board("Raspberry Pi Zero Rev 1.3")
+    assert_equal :pi_zero, Rgpio::HardwarePWM.detect_board("Raspberry Pi Model B Plus Rev 1.2")
+    assert_equal :pi_zero, Rgpio::HardwarePWM.detect_board("Raspberry Pi Model A Plus Rev 1.1")
+    assert_equal :pi_zero, Rgpio::HardwarePWM.detect_board("Raspberry Pi Compute Module Rev 1.0")
+  end
+
   def test_detect_board_unknown
     assert_equal :unknown, Rgpio::HardwarePWM.detect_board("Raspberry Pi 3 Model B Plus Rev 1.3")
+    assert_equal :unknown, Rgpio::HardwarePWM.detect_board("Raspberry Pi Zero 2 W Rev 1.0")
+    assert_equal :unknown, Rgpio::HardwarePWM.detect_board("Raspberry Pi Compute Module 3 Plus Rev 1.0")
     assert_equal :unknown, Rgpio::HardwarePWM.detect_board("")
+  end
+
+  def test_pi_zero_gpio12_resolves_bcm2835_chip
+    add_chip(num: 1, npwm: 2, rp1_address: "3f00b880")
+    add_chip(num: 0, npwm: 2, rp1_address: "2020c000")
+    add_channel(chip_num: 0, channel: 0)
+    pwm = Rgpio::HardwarePWM.new(gpio: 12, board: :pi_zero)
+    assert_equal :pi_zero, pwm.board
+    assert_equal 0, pwm.chip_num
+    assert_equal 0, pwm.channel
+  end
+
+  def test_pi_zero_gpio19_maps_channel1
+    add_chip(num: 0, npwm: 2, rp1_address: "2020c000")
+    add_channel(chip_num: 0, channel: 1)
+    assert_equal 1, Rgpio::HardwarePWM.new(gpio: 19, board: :pi_zero).channel
   end
 
   # ------------------------------------------------------------------ #
