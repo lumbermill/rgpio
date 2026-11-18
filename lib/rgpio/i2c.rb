@@ -19,6 +19,7 @@ module Rgpio
   # The I2C bus on the 40-pin header (GPIO2 = SDA, GPIO3 = SCL) is bus 1, and
   # only appears once it is enabled — see docs/guide.md for the dtparam line.
   class I2C
+    include Closeable
     extend Openable
 
     # ioctl numbers from <linux/i2c-dev.h>.
@@ -142,15 +143,11 @@ module Rgpio
       write(register, *bytes)
     end
 
-    def close
-      return if @closed
+    private
 
-      @closed = true
+    # What #close releases.
+    def release_resources
       @io.close
-    end
-
-    def closed?
-      @closed
     end
   end
 end

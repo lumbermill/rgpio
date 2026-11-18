@@ -9,6 +9,8 @@ module Rgpio
   #   red   = Rgpio::LED.new(17, chip: chip)
   #   green = Rgpio::LED.new(27, chip: chip)
   class Device
+    include Closeable
+
     # @param chip [Chip, nil] chip to drive this device on; nil opens (and
     #             later closes) a chip of its own via auto-detection
     def initialize(chip: nil)
@@ -20,22 +22,15 @@ module Rgpio
     # @return [Chip] the chip this device is driven on
     attr_reader :chip
 
-    # Release the device's lines, and the chip too if this device opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
+    private
 
-      @closed = true
-      release_resources
+    # Release the device's lines, and the chip too if this device opened it.
+    def release_resources
+      release_lines
       @chip.close if @owns_chip
     end
 
-    def closed?
-      @closed
-    end
-
-    private
-
-    def release_resources; end
+    # What a subclass holds on the chip; released before the chip itself.
+    def release_lines; end
   end
 end

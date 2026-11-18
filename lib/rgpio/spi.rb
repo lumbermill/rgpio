@@ -19,6 +19,7 @@ module Rgpio
   # CE0, GPIO7 = CE1), and only appears once it is enabled — see docs/guide.md for the
   # dtparam line.
   class SPI
+    include Closeable
     extend Openable
 
     # ioctl numbers from <linux/spi/spidev.h>, with the 'k' magic. They are
@@ -211,15 +212,11 @@ module Rgpio
       transfer([0] * count)
     end
 
-    def close
-      return if @closed
+    private
 
-      @closed = true
+    # What #close releases.
+    def release_resources
       @io.close
-    end
-
-    def closed?
-      @closed
     end
   end
 end

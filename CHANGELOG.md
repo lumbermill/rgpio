@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `close` / `closed?` come from one `Closeable` module in every class that
+  held its own copy (the devices, `SoftwarePWM`, `HardwarePWM`, `I2C`,
+  `SPI`): each defines only what it releases. `close` now returns `nil`
+  everywhere, and the closed error of `MCP3208` reads
+  `Rgpio::MCP3208 is closed`, as `ILI9341` and `XPT2046` already did.
 - `RGBLED`'s `pwm:` hash may name only some colours; the rest get `:auto`
   instead of failing. A key other than `:red`, `:green` or `:blue` raises
   `ArgumentError`.

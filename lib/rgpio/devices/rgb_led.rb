@@ -16,6 +16,8 @@ module Rgpio
   # some 16% of one core, and the threads occasionally collide, which shifts an
   # edge by microseconds — invisible in an LED's brightness.
   class RGBLED
+    include Closeable
+
     # Corners of the colour cube, for the common case of naming a colour.
     COLORS = {
       off: [0.0, 0.0, 0.0],
@@ -134,21 +136,13 @@ module Rgpio
 
     alias active? on?
 
-    # Stop all three channels, and close the chip if this LED opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
+    private
 
-      @closed = true
+    # Stop all three channels, and close the chip if this LED opened it.
+    def release_resources
       @channels.each_value(&:close)
       @chip.close if @owns_chip
     end
-
-    def closed?
-      @closed
-    end
-
-    private
 
     # Push the requested colour out through the balance. The channels hold the
     # scaled levels; #color keeps reporting what was asked for.

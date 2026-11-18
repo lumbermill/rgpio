@@ -3,6 +3,7 @@ module Rgpio
   # {Servo}): resolves `pwm:` into a channel (see {PWMChannel}), and on #close
   # releases a channel it opened or stops one it borrowed.
   class PWMDevice
+    include Closeable
     include PWMChannel
 
     # @param gpio      [Integer] GPIO line offset (BCM numbering)
@@ -23,20 +24,12 @@ module Rgpio
     # @return [Object] the PWM channel behind this device
     attr_reader :pwm
 
-    # Stop the channel, and release it if this device opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
+    private
 
-      @closed = true
+    # Stop the channel, and release it if this device opened it.
+    def release_resources
       @owns_pwm ? @pwm.close : @pwm.disable
     end
-
-    def closed?
-      @closed
-    end
-
-    private
 
     def assert_open!
       raise Error, "#{self.class} on GPIO#{@gpio} is closed" if @closed

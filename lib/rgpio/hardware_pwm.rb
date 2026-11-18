@@ -33,6 +33,7 @@ module Rgpio
   #   pwm.enable
   #   pwm.close   # disables + unexports
   class HardwarePWM
+    include Closeable
     extend Openable
 
     PWM_SYSFS_ROOT = "/sys/class/pwm".freeze
@@ -193,24 +194,6 @@ module Rgpio
       @enabled || false
     end
 
-    def closed?
-      @closed
-    end
-
-    # Disable and unexport the PWM channel, freeing the sysfs resource.
-    # A channel that was already exported when it was opened is left as it
-    # was found. Safe to call multiple times.
-    def close
-      return if @closed
-
-      @closed = true
-      return unless @exported
-
-      disable rescue nil
-      unexport_channel
-      @exported = false
-    end
-
     # Return a human-readable description of this PWM instance.
     def inspect
       "#<Rgpio::HardwarePWM board=#{@board} chip=#{@chip_num} channel=#{@channel} " \
@@ -250,6 +233,17 @@ module Rgpio
     end
 
     private
+
+    # Disable and unexport the PWM channel, freeing the sysfs resource.
+    # A channel that was already exported when it was opened is left as it
+    # was found.
+    def release_resources
+      return unless @exported
+
+      disable rescue nil
+      unexport_channel
+      @exported = false
+    end
 
     # Look up the PWM channel for a header GPIO on the resolved board.
     def gpio_channel(gpio)

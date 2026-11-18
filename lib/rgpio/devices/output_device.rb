@@ -51,7 +51,7 @@ module Rgpio
 
     private
 
-    def release_resources
+    def release_lines
       @request.release
     end
   end

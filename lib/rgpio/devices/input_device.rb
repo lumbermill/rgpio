@@ -93,7 +93,7 @@ module Rgpio
 
     # Stop the watcher before releasing the request: a wait in progress holds a
     # pointer into the request that libgpiod would free underneath it.
-    def release_resources
+    def release_lines
       @watching = false
       @watcher&.join
       @watcher = nil

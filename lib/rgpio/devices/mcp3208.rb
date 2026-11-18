@@ -17,6 +17,8 @@ module Rgpio
   # rate returns values that look plausible and are wrong. The 1 MHz default is
   # inside the envelope for a 3.3 V supply.
   class MCP3208
+    include Closeable
+
     DEFAULT_CHANNELS = 8
 
     # 12 bits, so 4096 codes: code 4095 means the input is at the reference.
@@ -60,7 +62,7 @@ module Rgpio
     #                     as IN+ when `channel` is even
     # @return [Integer] the raw code, 0..4095
     def read(channel, differential: false)
-      raise Error, "MCP3208 is closed" if @closed
+      assert_open!
       unless channel.is_a?(Integer) && (0...@channels).cover?(channel)
         raise ArgumentError, "channel must be in 0...#{@channels}, got #{channel.inspect}"
       end
@@ -89,16 +91,11 @@ module Rgpio
       Array.new(@channels) { |channel| read(channel) }
     end
 
+    private
+
     # Close the bus device, but only if this converter opened it.
-    def close
-      return if @closed
-
-      @closed = true
+    def release_resources
       @spi.close if @owns_spi
-    end
-
-    def closed?
-      @closed
     end
   end
 end

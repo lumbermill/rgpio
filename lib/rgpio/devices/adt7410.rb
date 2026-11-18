@@ -12,6 +12,8 @@ module Rgpio
   # the datasheet calls the default; 16-bit mode resolves 0.0078 degC and is
   # selected with `resolution: 16`.
   class ADT7410
+    include Closeable
+
     DEFAULT_ADDRESS = 0x48
 
     # Register map (the subset this driver uses).
@@ -101,16 +103,11 @@ module Rgpio
       raw / counts
     end
 
+    private
+
     # Close the bus device, but only if this sensor opened it.
-    def close
-      return if @closed
-
-      @closed = true
+    def release_resources
       @i2c.close if @owns_i2c
-    end
-
-    def closed?
-      @closed
     end
   end
 end

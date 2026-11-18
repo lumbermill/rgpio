@@ -23,6 +23,7 @@ module Rgpio
   # Every drawing call is one command sequence (window, then pixel data) held
   # under a lock, so a touch callback on another thread can draw too.
   class ILI9341
+    include Closeable
     extend Openable
 
     include Font5x7::Drawing
@@ -240,12 +241,11 @@ module Rgpio
       self
     end
 
+    private
+
     # Release the GPIO lines, and the bus and chip if this display opened them.
     # The panel keeps showing its last picture while it has power.
-    def close
-      return if @closed
-
-      @closed = true
+    def release_resources
       @backlight&.close
       @reset_request&.release
       @dc_request.release
@@ -253,14 +253,8 @@ module Rgpio
       @chip.close if @owns_chip
     end
 
-    def closed?
-      @closed
-    end
-
-    private
-
     def synchronize(&)
-      raise Error, "#{self.class} is closed" if @closed
+      assert_open!
 
       @lock.synchronize(&)
     end

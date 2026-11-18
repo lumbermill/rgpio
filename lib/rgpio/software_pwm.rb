@@ -40,6 +40,7 @@ module Rgpio
   # when the parent exits, however it exits, the child sees the pipe close,
   # leaves the line inactive and exits too.
   class SoftwarePWM
+    include Closeable
     extend Openable
 
     # gpiozero's default for PWMLED, and fast enough that an LED does not
@@ -194,12 +195,15 @@ module Rgpio
       @running
     end
 
-    # Stop, release the line, and close the chip if this channel opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
+    def inspect
+      format("#<%s gpio=%d frequency=%gHz duty_cycle=%.3f%s%s>",
+             self.class, @gpio, @frequency, @duty, @process ? " process" : "", @running ? " running" : "")
+    end
 
-      @closed = true
+    private
+
+    # Stop, release the line, and close the chip if this channel opened it.
+    def release_resources
       if @process
         # No disable first: closing the pipe is the child's signal to leave
         # the line inactive, release it and exit, and it works even when the
@@ -212,17 +216,6 @@ module Rgpio
         @chip.close if @owns_chip
       end
     end
-
-    def closed?
-      @closed
-    end
-
-    def inspect
-      format("#<%s gpio=%d frequency=%gHz duty_cycle=%.3f%s%s>",
-             self.class, @gpio, @frequency, @duty, @process ? " process" : "", @running ? " running" : "")
-    end
-
-    private
 
     def resolve_process(process)
       case process

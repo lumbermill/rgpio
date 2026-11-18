@@ -18,6 +18,8 @@ module Rgpio
   # it, the watcher thread sleeps on a kernel edge event until a touch; without
   # it, the watcher samples the pressure every POLL_INTERVAL.
   class XPT2046
+    include Closeable
+
     DEFAULT_SPEED_HZ = 2_000_000
 
     # Control byte: start bit, channel (A2..A0), 12-bit mode, differential
@@ -139,7 +141,7 @@ module Rgpio
     # @return [Array(Integer, Integer, Integer)] raw x, y (0..4095) and
     #   pressure z (0 when untouched, larger the harder the press)
     def raw
-      raise Error, "#{self.class} is closed" if @closed
+      assert_open!
 
       sample
     end
@@ -165,12 +167,11 @@ module Rgpio
       on(:released, &)
     end
 
+    private
+
     # Stop the watcher, then release the T_IRQ line, the bus and the chip as
     # far as this object opened them.
-    def close
-      return if @closed
-
-      @closed = true
+    def release_resources
       @watching = false
       @watcher&.join
       @watcher = nil
@@ -178,12 +179,6 @@ module Rgpio
       @spi.close if @owns_spi
       @chip.close if @owns_chip
     end
-
-    def closed?
-      @closed
-    end
-
-    private
 
     # #raw without the closed check. The watcher reads through this: #close
     # marks the device closed before it waits for the watcher, and the bus

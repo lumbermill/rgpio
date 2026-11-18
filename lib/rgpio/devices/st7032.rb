@@ -13,6 +13,7 @@ module Rgpio
   # controller has no way to read the panel back, so a blank display with the
   # backlight on is almost always contrast: raise or lower it with #contrast=.
   class ST7032
+    include Closeable
     extend Openable
 
     DEFAULT_ADDRESS = 0x3e
@@ -192,20 +193,13 @@ module Rgpio
       self
     end
 
+    private
+
     # Close the bus device, but only if this display opened it. The panel keeps
     # showing whatever was written last.
-    def close
-      return if @closed
-
-      @closed = true
+    def release_resources
       @i2c.close if @owns_i2c
     end
-
-    def closed?
-      @closed
-    end
-
-    private
 
     def validate_contrast(value)
       raise ArgumentError, "contrast must be in 0..63, got #{value}" unless CONTRAST_RANGE.cover?(value)

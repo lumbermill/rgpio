@@ -42,7 +42,7 @@ module Rgpio
 
     private
 
-    def release_resources
+    def release_lines
       stop
       @forward.close
       @backward.close

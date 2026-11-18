@@ -1,6 +1,7 @@
 require_relative "rgpio/version"
 require_relative "rgpio/ioctl"
 require_relative "rgpio/openable"
+require_relative "rgpio/closeable"
 require_relative "rgpio/bytes"
 require_relative "rgpio/native"
 require_relative "rgpio/chip"
