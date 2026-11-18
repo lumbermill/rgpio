@@ -575,9 +575,10 @@ i2c.write(0x40, "Hello")     # => 6
 ```
 
 Failures surface as the kernel's own `Errno` exceptions. When nothing
-acknowledges the address the class depends on the I2C controller:
-`Errno::EREMOTEIO` on a Pi 5, `Errno::EIO` on a Pi Zero's bcm2835 — rescue
-`SystemCallError` if the code must run on both. `Errno::EBUSY` when a kernel driver
+acknowledges the address the class depends on the I2C controller and the call:
+`Errno::EREMOTEIO` on a Pi 5; on a Pi Zero's bcm2835, `Errno::EIO` from `write`
+and `read` and either of the two from `write_read` — rescue `SystemCallError`
+to catch a missing device anywhere. `Errno::EBUSY` when a kernel driver
 already holds it (pass `force: true` to claim it anyway), `Errno::EACCES` when
 the user is not in the `i2c` group.
 

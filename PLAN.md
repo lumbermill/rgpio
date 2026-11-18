@@ -10,7 +10,7 @@ anything here is subject to change.
 | Phase | Scope | Status |
 |---|---|---|
 | **1** | Pi 5: GPIO I/O + hardware PWM | ✅ Done — verified on Pi 5 hardware |
-| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero W GPIO verified (I2C / SPI / devices pending) |
+| **2** | Auto-detect header gpiochip by label; Pi 4 / Pi Zero support | 🟢 Pi 4 GPIO + PWM verified (Trixie); Pi Zero W GPIO, SPI and I2C verified (most device classes pending) |
 | **3** | High-level API (`LED`, `Button`, `PWMLED`, `Servo`, …) | 🟢 3a–3d and 3f verified on Pi 5 (`MotionSensor` deferred; camera and distance-sensor class dropped) |
 
 ## Multi-board support — validation status
@@ -119,17 +119,27 @@ Pi Zero / 1 / 2 / 3). The selection logic is unit-tested and works on Pi 5.
   pin 21): a six-byte pattern, 64 bytes, one byte and a String came back
   identical at 100 kHz, 1, 4, 16 and 32 MHz in all four modes, and a
   4096-byte (spidev `bufsiz`) transfer at 8 MHz; the 32-bit build packs the
-  `spi_ioc_transfer` correctly. I2C bus layer only partly: with nothing on the
-  bus, write, read and `I2C_RDWR` all reach the controller and come back
-  `Errno::EIO` (Pi 5: `EREMOTEIO`) rather than `EFAULT` / `EINVAL`, so the
-  structs are accepted; no data has crossed it yet. Verified 2026-11-18.
+  `spi_ioc_transfer` correctly. Verified 2026-11-18.
+- Pi Zero W I2C (`/dev/i2c-1`, came up without a reboot): `ADT7410` (ID 0xcb,
+  room temperature in 13- and 16-bit modes) and `ST7032` on an AQM0802
+  (`examples/lcd_thermometer.rb`, read by eye) on one bus, so the 32-bit
+  `i2c_msg` / `I2C_RDWR` packing carries real data. An address nobody
+  acknowledges gives `Errno::EIO` from write and read, and `EIO` or
+  `EREMOTEIO` from `write_read` (Pi 5: always `EREMOTEIO`). Caveat: both
+  modules had just survived a reversed-supply mistake, so treat accuracy
+  figures from these two parts as suspect. Open question from the same run: a
+  plain `read` after a separate `write([reg])` always returned register 0x00
+  of the ADT7410, while `write_read` returned the pointed register — chip
+  behaviour or damage, to be checked with a healthy part on a Pi 5. The driver
+  uses `write_read`, so it is unaffected. Verified 2026-11-18.
 - Pi 4 hardware PWM (Model B Rev 1.5, Bookworm — `raspi24.local`): board
   detection → `:pi4`, chip detection (`fe20c000`, `npwm == 2`), `GPIO18 →
   channel 0`, full export/frequency/duty round-trip. Verified 2026-08-27.
 
 **Not yet validated on real hardware:**
 
-- Pi Zero W I2C data transfer and the device classes; Pi Zero 2 W and Pi 1. The
+- Pi Zero W GPIO and PWM device classes (`LED`, `Button`, `Servo`, …) and
+  `MCP3208`; Pi Zero 2 W and Pi 1. The
   `i2c_msg` struct layout is 32-bit-aware (the buffer pointer sits at offset 8
   either way) but has only been exercised on aarch64.
 - Whether `SoftwarePWM` on a Pi Zero should reduce its own garbage (the
