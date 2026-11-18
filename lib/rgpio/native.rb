@@ -11,7 +11,7 @@ module Rgpio
   # opaque-pointer API (callers never touch struct internals), so dropping ffi
   # costs us nothing here.
   #
-  # Do not use this module directly — use Chip / LineRequest / HardwarePWM.
+  # Do not use this module directly — use Chip / LineRequest.
   module Native
     extend Fiddle::Importer
 
@@ -32,52 +32,19 @@ module Rgpio
       false
     end
 
-    # A NULL pointer (replaces FFI::Pointer::NULL).
     NULL = Fiddle::NULL
 
-    # errno saved by the most recent native call (replaces FFI.errno).
+    # errno saved by the most recent native call.
     # @return [Integer]
     def self.errno
       Fiddle.last_error
     end
 
-    # Allocate a native buffer holding an array of uint32 line offsets
-    # (replaces FFI::MemoryPointer + put_array_of_uint32). The buffer owns its
-    # memory and is freed when garbage-collected.
+    # A native array of uint32 line offsets, freed when garbage-collected.
     # @param values [Array<Integer>]
     # @return [Fiddle::Pointer]
     def self.uint32_buffer(values)
-      packed = values.pack("L*")
-      ptr = Fiddle::Pointer.malloc(packed.bytesize, Fiddle::RUBY_FREE)
-      ptr[0, packed.bytesize] = packed
-      ptr
-    end
-
-    # Allocate a native buffer holding an array of C ints, e.g. an array of
-    # `enum gpiod_line_value` for gpiod_line_request_set_values_subset.
-    # @param values [Array<Integer>]
-    # @return [Fiddle::Pointer]
-    def self.int_buffer(values)
-      packed = values.pack("l*")
-      ptr = Fiddle::Pointer.malloc(packed.bytesize, Fiddle::RUBY_FREE)
-      ptr[0, packed.bytesize] = packed
-      ptr
-    end
-
-    # Allocate an uninitialised buffer sized for `count` C ints, for use as an
-    # output parameter (e.g. gpiod_line_request_get_values_subset).
-    # @param count [Integer]
-    # @return [Fiddle::Pointer]
-    def self.int_output_buffer(count)
-      Fiddle::Pointer.malloc(count * Fiddle::SIZEOF_INT, Fiddle::RUBY_FREE)
-    end
-
-    # Read `count` C ints back out of a buffer into a Ruby Array.
-    # @param ptr [Fiddle::Pointer]
-    # @param count [Integer]
-    # @return [Array<Integer>]
-    def self.read_int_buffer(ptr, count)
-      ptr[0, count * Fiddle::SIZEOF_INT].unpack("l*")
+      Bytes.pointer(values.pack("L*"))
     end
 
     if LIBRARY_AVAILABLE
@@ -191,15 +158,6 @@ module Rgpio
       # Offsets in the order the kernel indexes them in value bitmaps.
       extern "size_t gpiod_line_request_get_num_requested_lines(void *request)"
       extern "size_t gpiod_line_request_get_requested_offsets(void *request, void *offsets, size_t max_offsets)"
-      # Returns LINE_VALUE_ACTIVE / LINE_VALUE_INACTIVE / LINE_VALUE_ERROR
-      extern "int gpiod_line_request_get_value(void *request, unsigned int offset)"
-      # Returns 0 on success, -1 on error
-      extern "int gpiod_line_request_set_value(void *request, unsigned int offset, int value)"
-      # Atomic multi-line I/O over a subset of the requested offsets.
-      # offsets: uint32 buffer; values: int buffer of enum gpiod_line_value.
-      # Both return 0 on success, -1 on error.
-      extern "int gpiod_line_request_get_values_subset(void *request, size_t num_values, void *offsets, void *values)"
-      extern "int gpiod_line_request_set_values_subset(void *request, size_t num_values, void *offsets, void *values)"
 
       # -----------------------------------------------------------------------
       # Edge event waiting / reading
@@ -215,7 +173,6 @@ module Rgpio
       # -----------------------------------------------------------------------
       extern "void *gpiod_edge_event_buffer_new(size_t capacity)"
       extern "void gpiod_edge_event_buffer_free(void *buffer)"
-      extern "size_t gpiod_edge_event_buffer_get_num_events(void *buffer)"
       extern "void *gpiod_edge_event_buffer_get_event(void *buffer, unsigned long index)"
 
       # -----------------------------------------------------------------------
@@ -229,7 +186,7 @@ module Rgpio
       # -- Ruby-side conversion wrappers -------------------------------------
 
       # fiddle returns char* as a Fiddle::Pointer; convert to a Ruby String
-      # (nil when NULL) to match the old FFI :string behavior.
+      # (nil when NULL).
       STRING_RETURNING = %i[
         gpiod_api_version
         gpiod_chip_info_get_name

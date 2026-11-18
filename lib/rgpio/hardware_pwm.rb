@@ -2,7 +2,8 @@ module Rgpio
   # Controls a hardware PWM channel via the Linux PWM sysfs interface
   # (/sys/class/pwm/pwmchipN/pwmM/).
   #
-  # No FFI required — the kernel exposes the entire API through file I/O.
+  # No libgpiod involved — the kernel exposes the entire API through file I/O,
+  # so this works even where Rgpio.available? is false.
   #
   # Raspberry Pi 5 prerequisites
   # -----------------------------

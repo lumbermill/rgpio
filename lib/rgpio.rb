@@ -1,11 +1,13 @@
 require_relative "rgpio/version"
+require_relative "rgpio/ioctl"
+require_relative "rgpio/openable"
+require_relative "rgpio/bytes"
 require_relative "rgpio/native"
 require_relative "rgpio/chip"
 require_relative "rgpio/line_request"
 require_relative "rgpio/hardware_pwm"
 require_relative "rgpio/software_pwm/process_mode"
 require_relative "rgpio/software_pwm"
-require_relative "rgpio/bytes"
 require_relative "rgpio/i2c"
 require_relative "rgpio/spi"
 require_relative "rgpio/devices/device"
@@ -14,6 +16,7 @@ require_relative "rgpio/devices/input_device"
 require_relative "rgpio/devices/rotary_encoder"
 require_relative "rgpio/devices/motor"
 require_relative "rgpio/devices/pwm_channel"
+require_relative "rgpio/devices/pwm_device"
 require_relative "rgpio/devices/pwm_output_device"
 require_relative "rgpio/devices/rgb_led"
 require_relative "rgpio/devices/servo"
@@ -25,8 +28,11 @@ require_relative "rgpio/devices/font5x7"
 require_relative "rgpio/devices/ili9341"
 require_relative "rgpio/devices/xpt2046"
 
-# Ruby bindings for libgpiod v2 (Linux GPIO character device), bound through
-# the stdlib `fiddle`. Targets Debian Trixie (libgpiod >= 2.1) on Raspberry Pi.
+# GPIO, PWM, I2C and SPI on Raspberry Pi through the kernel's own interfaces:
+# GPIO through libgpiod v2 (bound with the stdlib `fiddle`), hardware PWM
+# through /sys/class/pwm, I2C and SPI through ioctl on their character devices,
+# and a gpiozero-style device layer on top. Targets Debian Trixie
+# (libgpiod >= 2.1).
 #
 # Quick start — GPIO output:
 #   Rgpio::Chip.open do |chip|

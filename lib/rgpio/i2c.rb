@@ -19,6 +19,8 @@ module Rgpio
   # The I2C bus on the 40-pin header (GPIO2 = SDA, GPIO3 = SCL) is bus 1, and
   # only appears once it is enabled — see docs/guide.md for the dtparam line.
   class I2C
+    extend Openable
+
     # ioctl numbers from <linux/i2c-dev.h>.
     I2C_SLAVE = 0x0703
     I2C_SLAVE_FORCE = 0x0706
@@ -62,19 +64,6 @@ module Rgpio
     # @return [Array<Integer>] bus numbers with a /dev/i2c-N node, ascending
     def self.buses
       Dir.glob("/dev/i2c-*").filter_map { |path| path[%r{/dev/i2c-(\d+)\z}, 1]&.to_i }.sort
-    end
-
-    # Open a device, yielding it and closing it afterwards when a block is given.
-    # @return [I2C, Object] the device, or the block's value
-    def self.open(address:, bus: DEFAULT_BUS)
-      i2c = new(address: address, bus: bus)
-      return i2c unless block_given?
-
-      begin
-        yield i2c
-      ensure
-        i2c.close
-      end
     end
 
     # @param address [Integer] 7-bit device address (e.g. 0x48)
@@ -133,9 +122,9 @@ module Rgpio
       raise ArgumentError, "write_read needs at least one byte to write" if out.empty?
       raise ArgumentError, "count must be positive, got #{count}" unless count.positive?
 
-      wbuf = buffer(out)
+      wbuf = Bytes.pointer(out)
       rbuf = Fiddle::Pointer.malloc(count, Fiddle::RUBY_FREE)
-      msgs = buffer(self.class.pack_msg(@address, 0, out.bytesize, wbuf.to_i) +
+      msgs = Bytes.pointer(self.class.pack_msg(@address, 0, out.bytesize, wbuf.to_i) +
                     self.class.pack_msg(@address, I2C_M_RD, count, rbuf.to_i))
       @io.ioctl(I2C_RDWR, self.class.pack_rdwr(msgs.to_i, 2))
       rbuf[0, count].unpack("C*")
@@ -162,14 +151,6 @@ module Rgpio
 
     def closed?
       @closed
-    end
-
-    private
-
-    def buffer(str)
-      ptr = Fiddle::Pointer.malloc(str.bytesize, Fiddle::RUBY_FREE)
-      ptr[0, str.bytesize] = str
-      ptr
     end
   end
 end

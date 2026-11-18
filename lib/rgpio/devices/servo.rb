@@ -19,9 +19,7 @@ module Rgpio
   # idle Pi 5 — half a degree of travel — and a busy machine can push an
   # occasional pulse 30-80 us out (see PLAN.md). See {PWMChannel} for how the
   # channel is chosen.
-  class Servo
-    include PWMChannel
-
+  class Servo < PWMDevice
     # The frame rate every hobby servo expects.
     DEFAULT_FREQUENCY = 50
 
@@ -46,23 +44,15 @@ module Rgpio
                    initial_value: 0.0, pwm: :auto, chip: nil, consumer: "rgpio")
       raise ArgumentError, "max_pulse_us must exceed min_pulse_us" unless max_pulse_us > min_pulse_us
 
-      @gpio = gpio
+      super(gpio, frequency: frequency, pwm: pwm, chip: chip, consumer: consumer)
       @min_pulse_us = min_pulse_us.to_f
       @max_pulse_us = max_pulse_us.to_f
       @min_angle = min_angle.to_f
       @max_angle = max_angle.to_f
       @value = nil
-      @closed = false
-      @pwm, @owns_pwm = resolve_pwm(pwm, gpio: gpio, frequency: frequency, chip: chip, consumer: consumer)
       self.value = initial_value
       @pwm.enable
     end
-
-    # @return [Integer] the GPIO line this servo is driven from
-    attr_reader :gpio
-
-    # @return [Object] the PWM channel behind this servo
-    attr_reader :pwm
 
     # @return [Float, nil] -1.0..1.0, or nil when detached
     attr_reader :value
@@ -75,7 +65,7 @@ module Rgpio
 
     # @param position [Float, nil] -1.0..1.0, or nil to detach
     def value=(position)
-      raise Error, "Servo on GPIO#{@gpio} is closed" if @closed
+      assert_open!
 
       if position.nil?
         detach
@@ -146,19 +136,6 @@ module Rgpio
     # @return [Boolean] true while pulses are being sent
     def attached?
       !@value.nil?
-    end
-
-    # Stop the channel, and release it if this servo opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
-
-      @closed = true
-      @owns_pwm ? @pwm.close : @pwm.disable
-    end
-
-    def closed?
-      @closed
     end
   end
 end

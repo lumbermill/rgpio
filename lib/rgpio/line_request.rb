@@ -27,17 +27,11 @@ module Rgpio
     # where the struct is { __u64 bits; __u64 mask; } — 16 bytes on 32- and
     # 64-bit alike. Bit i stands for the i-th line *of the request* (not the
     # offset), and the kernel applies active_low, so bits are logical values.
-    IOC_READ_WRITE = 3
     IOC_MAGIC = 0xB4
     LINE_VALUES_SIZE = 16
 
-    # @return [Integer] an encoded ioctl request
-    def self.ioctl_number(direction, request, size)
-      (direction << 30) | (size << 16) | (IOC_MAGIC << 8) | request
-    end
-
-    GET_VALUES_IOCTL = ioctl_number(IOC_READ_WRITE, 0x0E, LINE_VALUES_SIZE)
-    SET_VALUES_IOCTL = ioctl_number(IOC_READ_WRITE, 0x0F, LINE_VALUES_SIZE)
+    GET_VALUES_IOCTL = Ioctl.number(Ioctl::READ_WRITE, IOC_MAGIC, 0x0E, LINE_VALUES_SIZE)
+    SET_VALUES_IOCTL = Ioctl.number(Ioctl::READ_WRITE, IOC_MAGIC, 0x0F, LINE_VALUES_SIZE)
 
     # Pack a struct gpio_v2_line_values. One byte longer than the struct:
     # IO#ioctl wants room for a sentinel after the data and would otherwise

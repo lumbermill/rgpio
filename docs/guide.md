@@ -459,7 +459,7 @@ Frequencies above about 200 Hz take a large share of the core.
 ## Hardware PWM Usage
 
 Hardware PWM is controlled through the Linux PWM sysfs interface
-(`/sys/class/pwm/pwmchipN/`). No FFI required — pure file I/O.
+(`/sys/class/pwm/pwmchipN/`). No libgpiod involved — pure file I/O.
 
 ### Step 1 — Enable the PWM overlay
 

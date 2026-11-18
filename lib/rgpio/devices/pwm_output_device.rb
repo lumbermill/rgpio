@@ -7,9 +7,7 @@ module Rgpio
   # {SoftwarePWM} on every other line, and on those four without the overlay
   # (with a one-time warning). See {PWMChannel}. Pass `pwm: :software` or
   # `pwm: :hardware` to force one, or a channel object to share one.
-  class PWMOutputDevice
-    include PWMChannel
-
+  class PWMOutputDevice < PWMDevice
     # Fast enough that an LED does not visibly flicker, and gpiozero's default.
     DEFAULT_FREQUENCY = 100
 
@@ -25,26 +23,18 @@ module Rgpio
     # @param consumer      [String] name shown in the kernel's request list
     def initialize(gpio, frequency: DEFAULT_FREQUENCY, initial_value: 0.0, active_low: false,
                    pwm: :auto, chip: nil, consumer: "rgpio")
-      @gpio = gpio
+      super(gpio, frequency: frequency, pwm: pwm, chip: chip, consumer: consumer)
       @active_low = active_low
-      @closed = false
-      @pwm, @owns_pwm = resolve_pwm(pwm, gpio: gpio, frequency: frequency, chip: chip, consumer: consumer)
       self.value = initial_value
       @pwm.enable
     end
-
-    # @return [Integer] the GPIO line this device drives
-    attr_reader :gpio
-
-    # @return [Object] the PWM channel behind this device
-    attr_reader :pwm
 
     # @return [Float] current level, 0.0..1.0
     attr_reader :value
 
     # @param ratio [Float] 0.0 = off, 1.0 = full on
     def value=(ratio)
-      raise Error, "#{self.class} on GPIO#{@gpio} is closed" if @closed
+      assert_open!
       unless ratio.is_a?(Numeric) && (0.0..1.0).cover?(ratio)
         raise ArgumentError, "value must be in 0.0..1.0, got #{ratio.inspect}"
       end
@@ -80,19 +70,6 @@ module Rgpio
 
     def frequency=(hz)
       @pwm.frequency = hz
-    end
-
-    # Stop the channel, and release it if this device opened it.
-    # Safe to call multiple times.
-    def close
-      return if @closed
-
-      @closed = true
-      @owns_pwm ? @pwm.close : @pwm.disable
-    end
-
-    def closed?
-      @closed
     end
   end
 

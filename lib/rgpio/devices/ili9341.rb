@@ -23,6 +23,8 @@ module Rgpio
   # Every drawing call is one command sequence (window, then pixel data) held
   # under a lock, so a touch callback on another thread can draw too.
   class ILI9341
+    extend Openable
+
     include Font5x7::Drawing
 
     NATIVE_WIDTH = 240
@@ -90,19 +92,6 @@ module Rgpio
     RESET_PULSE = 0.01
     RESET_DELAY = 0.12
     SLEEP_OUT_DELAY = 0.12
-
-    # Open a display, yielding it and closing it afterwards when a block is given.
-    # @return [ILI9341, Object] the display, or the block's value
-    def self.open(**)
-      lcd = new(**)
-      return lcd unless block_given?
-
-      begin
-        yield lcd
-      ensure
-        lcd.close
-      end
-    end
 
     # @param dc            [Integer] GPIO line wired to D/C (sometimes DC/RS)
     # @param reset         [Integer, nil] GPIO line wired to RESET, or nil when

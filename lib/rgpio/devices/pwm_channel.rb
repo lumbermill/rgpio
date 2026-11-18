@@ -1,5 +1,5 @@
 module Rgpio
-  # Shared by the PWM-backed devices ({PWMOutputDevice}, {Servo}): turns the
+  # Used by {PWMDevice} ({PWMOutputDevice}, {Servo}): turns the
   # `pwm:` option into a channel to drive the line with.
   #
   # A symbol means the device opens — and later closes — a channel of its own:

@@ -40,6 +40,8 @@ module Rgpio
   # when the parent exits, however it exits, the child sees the pipe close,
   # leaves the line inactive and exits too.
   class SoftwarePWM
+    extend Openable
+
     # gpiozero's default for PWMLED, and fast enough that an LED does not
     # visibly flicker.
     DEFAULT_FREQUENCY = 100
@@ -76,19 +78,6 @@ module Rgpio
     # @return [Boolean] whether this machine has a single CPU core
     def self.single_core?
       Etc.nprocessors == 1
-    end
-
-    # Open a channel, yield it, then close it.
-    # @return [SoftwarePWM, Object] the channel, or the block's value
-    def self.open(gpio, **)
-      pwm = new(gpio, **)
-      return pwm unless block_given?
-
-      begin
-        yield pwm
-      ensure
-        pwm.close
-      end
     end
 
     # @param gpio       [Integer] GPIO line offset (BCM numbering)

@@ -13,6 +13,8 @@ module Rgpio
   # controller has no way to read the panel back, so a blank display with the
   # backlight on is almost always contrast: raise or lower it with #contrast=.
   class ST7032
+    extend Openable
+
     DEFAULT_ADDRESS = 0x3e
 
     # Control byte: instruction vs. display data.
@@ -48,19 +50,6 @@ module Rgpio
     EXECUTION_DELAY = 0.000_05
     CLEAR_DELAY = 0.002
     POWER_DELAY = 0.2
-
-    # Open a display, yielding it and closing it afterwards when a block is given.
-    # @return [ST7032, Object] the display, or the block's value
-    def self.open(**)
-      lcd = new(**)
-      return lcd unless block_given?
-
-      begin
-        yield lcd
-      ensure
-        lcd.close
-      end
-    end
 
     # @param address  [Integer] 7-bit address; the ST7032 is fixed at 0x3e
     # @param bus      [Integer] i2c-dev bus number

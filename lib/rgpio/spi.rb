@@ -19,12 +19,12 @@ module Rgpio
   # CE0, GPIO7 = CE1), and only appears once it is enabled — see docs/guide.md for the
   # dtparam line.
   class SPI
-    # ioctl numbers from <linux/spi/spidev.h>. They are built here rather than
-    # written out so the derivation stays checkable: direction in bits 30-31,
-    # payload size in 16-29, a 'k' magic in 8-15, and the request in 0-7.
+    extend Openable
+
+    # ioctl numbers from <linux/spi/spidev.h>, with the 'k' magic. They are
+    # built with {Ioctl.number} rather than written out so the derivation stays
+    # checkable.
     IOC_MAGIC = 0x6b
-    IOC_WRITE = 1
-    IOC_READ = 2
 
     # struct spi_ioc_transfer is { __u64 tx_buf; __u64 rx_buf; __u32 len;
     # __u32 speed_hz; __u16 delay_usecs; __u8 bits_per_word, cs_change,
@@ -57,21 +57,21 @@ module Rgpio
 
     # @return [Integer] the ioctl request for a message of `count` transfers
     def self.message_ioctl(count)
-      ioctl_number(IOC_WRITE, 0, TRANSFER_SIZE * count)
+      ioctl_number(Ioctl::WRITE, 0, TRANSFER_SIZE * count)
     end
 
-    # @return [Integer] an encoded ioctl request
+    # @return [Integer] an encoded spidev ioctl request
     def self.ioctl_number(direction, request, size)
-      (direction << 30) | (size << 16) | (IOC_MAGIC << 8) | request
+      Ioctl.number(direction, IOC_MAGIC, request, size)
     end
 
-    IOC_WR_MODE = ioctl_number(IOC_WRITE, 1, 1)
-    IOC_RD_MODE = ioctl_number(IOC_READ, 1, 1)
-    IOC_WR_LSB_FIRST = ioctl_number(IOC_WRITE, 2, 1)
-    IOC_WR_BITS_PER_WORD = ioctl_number(IOC_WRITE, 3, 1)
-    IOC_RD_BITS_PER_WORD = ioctl_number(IOC_READ, 3, 1)
-    IOC_WR_MAX_SPEED_HZ = ioctl_number(IOC_WRITE, 4, 4)
-    IOC_RD_MAX_SPEED_HZ = ioctl_number(IOC_READ, 4, 4)
+    IOC_WR_MODE = ioctl_number(Ioctl::WRITE, 1, 1)
+    IOC_RD_MODE = ioctl_number(Ioctl::READ, 1, 1)
+    IOC_WR_LSB_FIRST = ioctl_number(Ioctl::WRITE, 2, 1)
+    IOC_WR_BITS_PER_WORD = ioctl_number(Ioctl::WRITE, 3, 1)
+    IOC_RD_BITS_PER_WORD = ioctl_number(Ioctl::READ, 3, 1)
+    IOC_WR_MAX_SPEED_HZ = ioctl_number(Ioctl::WRITE, 4, 4)
+    IOC_RD_MAX_SPEED_HZ = ioctl_number(Ioctl::READ, 4, 4)
 
     # Pack a struct spi_ioc_transfer. Kept at class level so the layout can be
     # checked without a bus present.
@@ -92,19 +92,6 @@ module Rgpio
         match = path.match(%r{/dev/spidev(\d+)\.(\d+)\z})
         [match[1].to_i, match[2].to_i] if match
       end.sort
-    end
-
-    # Open a device, yielding it and closing it afterwards when a block is given.
-    # @return [SPI, Object] the device, or the block's value
-    def self.open(**)
-      spi = new(**)
-      return spi unless block_given?
-
-      begin
-        yield spi
-      ensure
-        spi.close
-      end
     end
 
     # @param bus           [Integer] spidev bus number; 0 is the 40-pin header
@@ -180,7 +167,7 @@ module Rgpio
       out = Bytes.pack(bytes)
       raise ArgumentError, "transfer needs at least one byte" if out.empty?
 
-      tx = buffer(out)
+      tx = Bytes.pointer(out)
       rx = Fiddle::Pointer.malloc(out.bytesize, Fiddle::RUBY_FREE)
       message = self.class.pack_transfer(tx.to_i, rx.to_i, out.bytesize, speed_hz || @speed_hz,
                                          bits_per_word: @bits_per_word, delay_us: delay_us)
@@ -233,14 +220,6 @@ module Rgpio
 
     def closed?
       @closed
-    end
-
-    private
-
-    def buffer(str)
-      ptr = Fiddle::Pointer.malloc(str.bytesize, Fiddle::RUBY_FREE)
-      ptr[0, str.bytesize] = str
-      ptr
     end
   end
 end

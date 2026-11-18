@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `lib/rgpio/pwm.rb` is now `lib/rgpio/hardware_pwm.rb`, next to
+  `software_pwm.rb`. Internal duplication is gone: `PWMOutputDevice` and
+  `Servo` share a `PWMDevice` base class, the block-or-return `open` of
+  `SoftwarePWM`, `I2C`, `SPI`, `ST7032` and `ILI9341` comes from one
+  `Openable` module (so `I2C.open` now passes `force:` through as `I2C.new`
+  takes it), and ioctl numbers and native buffers have one helper each
+  (`Rgpio::Ioctl`, `Rgpio::Bytes.pointer`). Removed the `Native` bindings and
+  buffer helpers that nothing used since values moved to ioctls
+  (`gpiod_line_request_get_value` / `set_value` / `*_values_subset`,
+  `int_buffer`, `int_output_buffer`, `read_int_buffer`), and the per-class
+  ioctl constants they duplicated (`LineRequest::IOC_READ_WRITE`,
+  `LineRequest.ioctl_number`, `SPI::IOC_WRITE`, `SPI::IOC_READ`).
 - `PWMLED`, `RGBLED` and `Servo` default to `pwm: :auto`, which picks the
   channel from the pin: `HardwarePWM` on GPIO12/13/18/19 when a dtoverlay has
   routed the pin to the PWM peripheral (the kernel holds the line), and
